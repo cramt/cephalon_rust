@@ -1,10 +1,7 @@
-[dist.dependencies.homebrew]
-pango = "*"
-gobject-introspection = "*"
-
 [dist.dependencies.apt]
 libgtk-4-dev = '*'
 libglib2.0-dev = "*"
+pkg-config = "*"
 
 [dist.dependencies.chocolatey]
 libgtk-4-dev = '*'
