@@ -78,6 +78,7 @@
           packages = with pkgs; [
             sqlx-cli
             bacon
+            sqlite
           ];
 
           shellHook = ''

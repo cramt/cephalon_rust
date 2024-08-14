@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use sqlx::{Pool, Sqlite, SqlitePool};
 use tokio::{
     sync::{OnceCell, Semaphore},
     time::sleep,
@@ -30,7 +31,7 @@ impl Middleware for RateLimittingMiddleware {
             if res.status() != StatusCode::TOO_MANY_REQUESTS {
                 break res;
             }
-            sleep(Duration::new(1, 0)).await;
+            sleep(Duration::new(0, 100)).await;
         };
         drop(permit);
         Ok(res)
@@ -49,4 +50,36 @@ pub async fn client() -> &'static ClientWithMiddleware {
         })
         .await;
     static_ref
+}
+
+#[derive(serde::Deserialize)]
+pub struct Settings {
+    pub database_url: String,
+}
+
+pub async fn settings() -> &'static Settings {
+    static ONCE: OnceCell<Settings> = OnceCell::const_new();
+
+    ONCE.get_or_init(|| async {
+        config::Config::builder()
+            .add_source(config::Environment::default())
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap()
+    })
+    .await
+}
+
+pub async fn db_conn() -> &'static Pool<Sqlite> {
+    static ONCE: OnceCell<Pool<Sqlite>> = OnceCell::const_new();
+
+    ONCE.get_or_init(|| async {
+        let pool = SqlitePool::connect(&settings().await.database_url)
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    })
+    .await
 }

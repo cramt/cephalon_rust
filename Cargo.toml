@@ -15,3 +15,4 @@ reqwest-middleware = "0.3.3"
 async-trait = "0.1.81"
 http = "1.1.0"
 anyhow = "1.0.86"
+sea-query = {version = "0.31.0", features = ["derive"]}
