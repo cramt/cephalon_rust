@@ -1,0 +1,8 @@
+[dist.dependencies.homebrew]
+pango = "*"
+
+[dist.dependencies.apt]
+libgtk-4-dev = '*'
+
+[dist.dependencies.chocolatey]
+libgtk-4-dev = '*'
