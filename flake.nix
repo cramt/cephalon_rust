@@ -39,6 +39,7 @@
           ];
 
           buildInputs = [
+            pkgs.gtk4
             pkgs.openssl
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv

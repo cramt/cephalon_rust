@@ -3,7 +3,7 @@ pub mod relics;
 
 use item_identifiers::get_item_identifiers;
 use relics::fetch_relics;
-use sea_query::{Iden, Query, QueryStatementWriter, SqliteQueryBuilder};
+use sea_query::{Iden, Query, SqliteQueryBuilder};
 use serde::{Deserialize, Serialize};
 
 use crate::config::db_conn;
