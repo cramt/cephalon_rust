@@ -6,10 +6,16 @@ pub mod items;
 
 #[tokio::main]
 async fn main() {
-    let a = Window::all()
-        .unwrap()
+    let windows = Window::all().unwrap();
+
+    println!(
+        "{:?}",
+        windows.iter().map(|x| x.title()).collect::<Vec<_>>()
+    );
+    let warframe_window = windows
         .into_iter()
-        .map(|x| x.app_name().to_owned())
-        .collect::<Vec<_>>();
-    println!("{a:?}");
+        .find(|x| x.title() == "Warframe")
+        .unwrap();
+    let image = warframe_window.capture_image().unwrap();
+    image.save("a.png").unwrap();
 }
