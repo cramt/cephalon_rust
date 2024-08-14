@@ -9,17 +9,34 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, ... }:
+  outputs = { self, nixpkgs, crane, flake-utils, fenix, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
         inherit (pkgs) lib;
 
-        craneLib = crane.mkLib pkgs;
+
+        toolchain = with fenix.packages.${system};
+          combine [
+            minimal.rustc
+            minimal.cargo
+            targets.aarch64-apple-darwin.latest.rust-std
+            targets.x86_64-apple-darwin.latest.rust-std
+            targets.x86_64-unknown-linux-gnu.latest.rust-std
+            targets.x86_64-unknown-linux-musl.latest.rust-std
+            targets.x86_64-pc-windows-msvc.latest.rust-std
+          ];
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
 
         sqlFilter = path: _type: null != builtins.match ".*sql$" path;
         sqlOrCargo = path: type: (sqlFilter path type) || (craneLib.filterCargoSources path type);
@@ -80,6 +97,7 @@
             sqlx-cli
             bacon
             sqlite
+            cargo-dist
           ];
 
           shellHook = ''

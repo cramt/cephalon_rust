@@ -1,7 +1,17 @@
 [package]
 name = "cephalon_rust"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+repository = "https://github.com/cramt/cephalon_rust"
+homepage = "https://github.com/cramt/cephalon_rust"
+description = "a open source cross platform warframe helper"
+authors = ["cramt"]
+
+[package.metadata.wix]
+upgrade-guid = "4F233220-8563-4A4A-B6EB-5A3FC3073301"
+path-guid = "DAEDFDED-5146-4ED7-A661-1799F8126C20"
+license = false
+eula = false
 
 [dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
@@ -18,3 +28,25 @@ anyhow = "1.0.86"
 sea-query = {version = "0.31.0", features = ["derive"]}
 gtk4 = "0.9.0"
 xcap = "0.0.11"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.19.1"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell", "msi"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Publish jobs to run in CI
+pr-run-mode = "plan"
+# Whether to install an updater program
+install-updater = true

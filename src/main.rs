@@ -18,4 +18,5 @@ async fn main() {
         .unwrap();
     let image = warframe_window.capture_image().unwrap();
     image.save("a.png").unwrap();
+    db_reset().await.unwrap();
 }
