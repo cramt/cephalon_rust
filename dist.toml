@@ -1,7 +1,7 @@
 [dist.dependencies.apt]
-libgtk-4-dev = '*'
-libglib2.0-dev = "*"
-pkg-config = "*"
+libgtk-4-dev = { stage = ["build", "run"] }
+libglib2.0-dev = { stage = ["build", "run"] }
+pkg-config = { stage = ["build", "run"] }
 
 [dist.dependencies.chocolatey]
 libgtk-4-dev = '*'
