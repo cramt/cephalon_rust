@@ -28,6 +28,7 @@ anyhow = "1.0.86"
 sea-query = {version = "0.31.0", features = ["derive"]}
 gtk4 = "0.9.0"
 xcap = "0.0.11"
+gtk4-layer-shell = "0.4.0"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

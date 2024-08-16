@@ -57,6 +57,7 @@
 
           buildInputs = [
             pkgs.gtk4
+            pkgs.gtk4-layer-shell
             pkgs.openssl
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
@@ -101,6 +102,7 @@
           ];
 
           shellHook = ''
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
             touch config.env
             export $(grep -v '^#' config.env | xargs -d '\n')
           '';
