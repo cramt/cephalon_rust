@@ -55,10 +55,12 @@
             pkgs.pkg-config
           ];
 
-          buildInputs = [
-            pkgs.gtk4
-            pkgs.gtk4-layer-shell
-            pkgs.openssl
+          buildInputs = with pkgs; [
+            gtk4
+            gtk4-layer-shell
+            openssl
+            glib
+            xorg.libxcb
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
             pkgs.darwin.apple_sdk.frameworks.Security
