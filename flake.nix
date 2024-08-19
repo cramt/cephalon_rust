@@ -15,15 +15,19 @@
     };
 
     flake-utils.url = "github:numtide/flake-utils";
+
+    oranda = {
+      url = "github:axodotdev/oranda";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, fenix, ... }:
+  outputs = { self, nixpkgs, crane, flake-utils, fenix, oranda, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
         inherit (pkgs) lib;
-
 
         toolchain = with fenix.packages.${system};
           combine [
@@ -108,6 +112,7 @@
             bacon
             sqlite
             cargo-dist
+            oranda.packages.${system}.oranda
           ];
 
           shellHook = ''
