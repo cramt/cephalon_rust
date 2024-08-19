@@ -26,12 +26,11 @@ async-trait = "0.1.81"
 http = "1.1.0"
 anyhow = "1.0.86"
 sea-query = {version = "0.31.0", features = ["derive"]}
-gtk4 = "0.9.0"
 xcap = "0.0.11"
-gtk4-layer-shell = "0.4.0"
-gdk-wayland = { version = "0.9.0", package = "gdk4-wayland" }
 dirs = "5.0.1"
 async-watcher = "0.3.0"
+eframe = "0.28.1"
+egui = "0.28.1"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

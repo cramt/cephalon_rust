@@ -1,8 +1,7 @@
-use gtk4::{prelude::*, Application, ApplicationWindow, Fixed, Label};
-use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use items::db_reset;
 use log_watcher::watcher;
 use xcap::Window;
+use eframe::egui::*;
 
 pub mod config;
 pub mod items;
@@ -26,37 +25,37 @@ async fn main2() {
 
 #[tokio::main]
 async fn main(){
+    //watcher().await;
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([400.0, 100.0])
+            .with_min_inner_size([400.0, 100.0])
+            .with_maximized(true)
+            .with_transparent(true) 
+            .with_mouse_passthrough(true)
+            .with_position(egui::Pos2::new(100.0, 100.0))
+            .with_resizable(false)
+            .with_transparent(true)
+            .with_decorations(false)
+            .with_drag_and_drop(false)
+            .with_always_on_top(),
+        ..Default::default()
+    };
 
-    watcher().await;
+    eframe::run_native("Popups", options, Box::new(|_| Ok(Box::<MyApp>::default()))).unwrap();
+}
 
-    gtk4::gdk::set_allowed_backends("wayland,x11,win32,macos,*");
+#[derive(Default)]
+struct MyApp {
+    checkbox: bool,
+    number: u8,
+}
 
-    println!("{:?}", gtk4::gdk::DisplayManager::get().list_displays());
-    let app = Application::builder().application_id("org.github.cramt.cephalon_rust").build();
-
-    app.connect_startup(|_|{
-        let provider = gtk4::CssProvider::new();
-        provider.load_from_data(include_str!("style.css"));
-        gtk4::style_context_add_provider_for_display(
-            &gtk4::gdk::Display::default().expect("Could not connect to a display."),
-            &provider,
-            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
-    });
-
-    app.connect_activate(|x|{
-        let fixed = Fixed::builder().can_focus(false).can_target(false).focusable(false).focus_on_click(false).sensitive(false).build();
-        fixed.put(&Label::builder().can_target(false).can_focus(false).focusable(false).focus_on_click(false).sensitive(false).label("test").build(), 100.0, 100.0);
-        let window = ApplicationWindow::builder().application(x).child(&fixed).can_focus(false).can_target(false).focusable(false).focus_on_click(false).sensitive(false).build();
-        window.init_layer_shell();
-        window.set_layer(Layer::Overlay);
-        window.set_anchor(Edge::Top, true);
-        window.set_anchor(Edge::Left, true);
-        window.set_anchor(Edge::Right, true);
-        window.set_anchor(Edge::Bottom, true);
-        window.set_keyboard_mode(KeyboardMode::None);
-        //window.show();
-
-    });
-    app.run();
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        ctx.send_viewport_cmd(ViewportCommand::MousePassthrough(true));
+egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label(format!("hello there"));
+        });
+    }
 }

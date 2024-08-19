@@ -29,10 +29,7 @@
           combine [
             minimal.rustc
             minimal.cargo
-            targets.aarch64-apple-darwin.latest.rust-std
-            targets.x86_64-apple-darwin.latest.rust-std
             targets.x86_64-unknown-linux-gnu.latest.rust-std
-            targets.x86_64-unknown-linux-musl.latest.rust-std
             targets.x86_64-pc-windows-msvc.latest.rust-std
           ];
 
@@ -51,17 +48,27 @@
           inherit src;
           strictDeps = true;
 
-          nativeBuildInputs = [
-            pkgs.pkg-config
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            python3
+            cmake
           ];
 
           buildInputs = with pkgs; [
-            gtk4
-            gtk4-layer-shell
             openssl
             glib
-            xorg.libxcb
-          ] ++ lib.optionals pkgs.stdenv.isDarwin [
+            libGL
+            libGLU
+          ] ++ (with pkgs.xorg; [
+            libxcb
+            libXcursor
+            libXrandr
+            libXi
+            libX11
+            wayland
+            libxkbcommon
+            libXinerama
+          ]) ++ lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
             pkgs.darwin.apple_sdk.frameworks.Security
           ];
