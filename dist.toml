@@ -1,9 +1,5 @@
 [dist.dependencies.apt]
-libgtk-4-dev = { stage = ["build", "run"] }
 pkg-config = { stage = ["build"] }
 build-essential = {stage = ["build"]}
 
 [dist.dependencies.chocolatey]
-libgtk-4-dev = '*'
-libglib2.0-dev = "*"
-pkgconfiglite = "*"

@@ -53,7 +53,6 @@ struct MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-        ctx.send_viewport_cmd(ViewportCommand::MousePassthrough(true));
 egui::CentralPanel::default().show(ctx, |ui| {
             ui.label(format!("hello there"));
         });
