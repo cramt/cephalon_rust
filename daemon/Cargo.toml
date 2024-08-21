@@ -1,0 +1,20 @@
+[package]
+name = "cephalon_rust_daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "fs"] }
+serde_json = "1.0"
+serde = { version = "1", features = ["derive"] }
+reqwest = { version = "0.12", features = ["json"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "migrate"] }
+futures = "0.3"
+config = "0.14"
+reqwest-middleware = "0.3.3"
+async-trait = "0.1.81"
+http = "1.1.0"
+anyhow = "1.0.86"
+sea-query = {version = "0.31.0", features = ["derive"]}
+dirs = "5.0.1"
+async-watcher = "0.3.0"

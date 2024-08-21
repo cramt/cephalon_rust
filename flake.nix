@@ -34,7 +34,7 @@
             minimal.rustc
             minimal.cargo
             targets.x86_64-unknown-linux-gnu.latest.rust-std
-            targets.x86_64-pc-windows-msvc.latest.rust-std
+            targets.x86_64-pc-windows-gnu.latest.rust-std
           ];
 
         craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
@@ -49,41 +49,34 @@
         };
 
         commonArgs = {
-          inherit src;
           strictDeps = true;
 
           nativeBuildInputs = with pkgs; [
             pkg-config
-            python3
-            cmake
           ];
 
           buildInputs = with pkgs; [
             openssl
-            glib
-            libGL
-            libGLU
-          ] ++ (with pkgs.xorg; [
-            libxcb
-            libXcursor
-            libXrandr
-            libXi
-            libX11
-            wayland
-            libxkbcommon
-            libXinerama
-          ]) ++ lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.libiconv
-            pkgs.darwin.apple_sdk.frameworks.Security
           ];
+
         };
 
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        cephalon_rust = craneLib.buildPackage (commonArgs // {
-          inherit cargoArtifacts;
+        commonArgsDaemon = commonArgs // {
+          pname = "cephalon_rust_daemon";
+          src = src;
+          cargoExtraArgs = "-p cephalon_rust_daemon";
+          version = "0.1.0";
+        };
 
-          nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+        cargoArtifactsDaemon = craneLib.buildDepsOnly commonArgsDaemon;
+
+        # Build the actual crate itself, reusing the dependency
+        # artifacts from above.
+        cephalon_rust_daemon = craneLib.buildPackage (commonArgsDaemon // {
+          inherit cargoArtifactsDaemon;
+
+          nativeBuildInputs = (commonArgsDaemon.nativeBuildInputs or [ ]) ++ [
             pkgs.sqlx-cli
           ];
 
@@ -93,33 +86,59 @@
             sqlx migrate run
           '';
         });
+
+        commonArgsOverlay = commonArgs // {
+          pname = "cephalon_rust_overlay";
+          src = craneLib.cleanCargoSource ./.;
+          cargoExtraArgs = "-p cephalon_rust_overlay";
+          version = "0.1.0";
+
+          CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
+
+          # fixes issues related to libring
+          TARGET_CC = "${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/${pkgs.pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
+
+          #fixes issues related to openssl
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include/";
+
+          depsBuildBuild = with pkgs; [
+            pkgsCross.mingwW64.stdenv.cc
+            pkgsCross.mingwW64.windows.pthreads
+          ];
+        };
+
+        cargoArtifactsOverlay = craneLib.buildDepsOnly commonArgsOverlay;
+
+        cephalon_rust_overlay = craneLib.buildPackage (commonArgsOverlay // {
+          inherit cargoArtifactsOverlay;
+
+          strictDeps = true;
+          doCheck = false;
+        });
       in
       {
-        checks = {
-          inherit cephalon_rust;
-        };
-
         packages = {
-          default = cephalon_rust;
-          inherit cephalon_rust;
+          overlay = cephalon_rust_overlay;
+          daemon = cephalon_rust_daemon;
         };
-
-        devShells.default = craneLib.devShell {
-          checks = self.checks.${system};
-
-          packages = with pkgs; [
-            sqlx-cli
-            bacon
-            sqlite
-            cargo-dist
-            oranda.packages.${system}.oranda
-          ];
-
-          shellHook = ''
-            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
-            touch config.env
-            export $(grep -v '^#' config.env | xargs -d '\n')
-          '';
+        devShells = {
+          overlay = craneLib.devShell (commonArgsOverlay // {
+            packages = with pkgs; [
+              bacon
+            ];
+          });
+          daemon = craneLib.devShell (commonArgsDaemon // {
+            packages = with pkgs; [
+              bacon
+              sqlx-cli
+              pkg-config
+            ];
+            shellHook = ''
+              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH
+            '';
+          });
         };
       });
 }

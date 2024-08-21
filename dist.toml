@@ -1,5 +1,0 @@
-[dist.dependencies.apt]
-pkg-config = { stage = ["build"] }
-build-essential = {stage = ["build"]}
-
-[dist.dependencies.chocolatey]
