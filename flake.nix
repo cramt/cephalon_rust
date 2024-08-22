@@ -129,6 +129,8 @@
               bacon
               wineWowPackages.staging
             ];
+            shellHook = ''
+            '';
           });
           daemon = craneLib.devShell (commonArgsDaemon // {
             packages = with pkgs; [
