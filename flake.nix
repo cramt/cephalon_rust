@@ -127,6 +127,7 @@
           overlay = craneLib.devShell (commonArgsOverlay // {
             packages = with pkgs; [
               bacon
+              wineWowPackages.staging
             ];
           });
           daemon = craneLib.devShell (commonArgsDaemon // {
