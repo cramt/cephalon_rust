@@ -59,6 +59,19 @@
             openssl
           ];
 
+          # fixes issues related to libring
+          TARGET_CC = "${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/${pkgs.pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
+
+          #fixes issues related to openssl
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include/";
+
+          depsBuildBuild = with pkgs; [
+            pkgsCross.mingwW64.stdenv.cc
+            pkgsCross.mingwW64.windows.pthreads
+          ];
+
         };
 
 
@@ -92,21 +105,6 @@
           src = craneLib.cleanCargoSource ./.;
           cargoExtraArgs = "-p cephalon_rust_overlay";
           version = "0.1.0";
-
-          CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu";
-
-          # fixes issues related to libring
-          TARGET_CC = "${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/${pkgs.pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
-
-          #fixes issues related to openssl
-          OPENSSL_DIR = "${pkgs.openssl.dev}";
-          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
-          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include/";
-
-          depsBuildBuild = with pkgs; [
-            pkgsCross.mingwW64.stdenv.cc
-            pkgsCross.mingwW64.windows.pthreads
-          ];
         };
 
         cargoArtifactsOverlay = craneLib.buildDepsOnly commonArgsOverlay;
@@ -124,10 +122,25 @@
           daemon = cephalon_rust_daemon;
         };
         devShells = {
+          default = craneLib.devShell (commonArgsDaemon // {
+            packages = with pkgs; [
+              bacon
+              sqlx-cli
+              pkg-config
+              rust-analyzer
+              rustfmt
+              wineWowPackages.staging
+            ];
+            shellHook = ''
+              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH
+            '';
+          });
           overlay = craneLib.devShell (commonArgsOverlay // {
             packages = with pkgs; [
               bacon
               wineWowPackages.staging
+              rust-analyzer
+              rustfmt
             ];
             shellHook = ''
             '';
@@ -137,6 +150,8 @@
               bacon
               sqlx-cli
               pkg-config
+              rust-analyzer
+              rustfmt
             ];
             shellHook = ''
               export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH

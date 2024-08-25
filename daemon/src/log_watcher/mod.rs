@@ -1,22 +1,56 @@
 use std::{ffi::OsStr, io::SeekFrom, path::PathBuf, time::Duration};
 
 use async_watcher::{notify::RecursiveMode, AsyncDebouncer};
-use tokio::{fs::File, io::{AsyncBufReadExt, AsyncSeekExt, BufReader}, time::sleep};
+use tokio::{
+    fs::File,
+    io::{AsyncBufReadExt, AsyncSeekExt, BufReader},
+    time::sleep,
+};
 
 #[cfg(target_os = "linux")]
-static DEFAULT_PATH: [&str; 14] = [".local","share","Steam","steamapps","compatdata","230410","pfx","drive_c","users","steamuser","AppData","Local","Warframe","EE.log"];
+static DEFAULT_PATH: [&str; 14] = [
+    ".local",
+    "share",
+    "Steam",
+    "steamapps",
+    "compatdata",
+    "230410",
+    "pfx",
+    "drive_c",
+    "users",
+    "steamuser",
+    "AppData",
+    "Local",
+    "Warframe",
+    "EE.log",
+];
 #[cfg(target_os = "windows")]
-static DEFAULT_PATH: [&str; 3] = ["AppData","Local","Warframe"];
+static DEFAULT_PATH: [&str; 3] = ["AppData", "Local", "Warframe"];
 
 pub fn get_default_path() -> PathBuf {
-    dirs::home_dir().unwrap().into_iter().chain(DEFAULT_PATH.iter().map(OsStr::new)).collect()
+    dirs::home_dir()
+        .unwrap()
+        .into_iter()
+        .chain(DEFAULT_PATH.iter().map(OsStr::new))
+        .collect()
 }
 
-async fn raw_watcher() -> Result<tokio::sync::mpsc::Receiver<Result<Vec<async_watcher::DebouncedEvent>, Vec<async_watcher::notify::Error>>>, anyhow::Error> {
-
+async fn raw_watcher() -> Result<
+    tokio::sync::mpsc::Receiver<
+        Result<Vec<async_watcher::DebouncedEvent>, Vec<async_watcher::notify::Error>>,
+    >,
+    anyhow::Error,
+> {
     let (tx, rx) = tokio::sync::mpsc::channel(100);
-    let mut debouncer = AsyncDebouncer::new(Duration::from_millis(100), Some(Duration::from_millis(100)), tx).await?; 
-    debouncer.watcher().watch(&get_default_path(), RecursiveMode::Recursive)?;
+    let mut debouncer = AsyncDebouncer::new(
+        Duration::from_millis(100),
+        Some(Duration::from_millis(100)),
+        tx,
+    )
+    .await?;
+    debouncer
+        .watcher()
+        .watch(&get_default_path(), RecursiveMode::Recursive)?;
     Ok(rx)
 }
 
@@ -38,7 +72,4 @@ pub async fn watcher() {
             sleep(Duration::from_millis(100)).await;
         }
     });
-
-    
 }
-

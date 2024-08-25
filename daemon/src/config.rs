@@ -55,6 +55,7 @@ pub async fn client() -> &'static ClientWithMiddleware {
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database_url: String,
+    pub overlay_oath: String
 }
 
 pub async fn settings() -> &'static Settings {
