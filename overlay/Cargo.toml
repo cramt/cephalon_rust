@@ -4,6 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-windows = {workspace = true}
-native-windows-gui = {workspace = true}
-windows-strings = {workspace = true}
+iced = {version = "0.12.1", features =["tokio", "canvas","debug"]}
+iced_layershell = "0.5.1"

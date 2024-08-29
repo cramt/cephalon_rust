@@ -57,6 +57,19 @@
 
           buildInputs = with pkgs; [
             openssl
+            freetype
+
+            libxkbcommon
+            libGL
+
+            # WINIT_UNIX_BACKEND=wayland
+            wayland
+
+            # WINIT_UNIX_BACKEND=x11
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libX11
           ];
 
           # fixes issues related to libring
@@ -132,7 +145,8 @@
               wineWowPackages.staging
             ];
             shellHook = ''
-              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH
+              export $(cat config.env | xargs)
+              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
             '';
           });
           overlay = craneLib.devShell (commonArgsOverlay // {
@@ -143,6 +157,8 @@
               rustfmt
             ];
             shellHook = ''
+              export $(cat config.env | xargs)
+              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
             '';
           });
           daemon = craneLib.devShell (commonArgsDaemon // {
@@ -154,6 +170,7 @@
               rustfmt
             ];
             shellHook = ''
+              export $(cat config.env | xargs)
               export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH
             '';
           });

@@ -1,134 +1,164 @@
-use native_windows_gui as nwg;
-use nwg::NativeUi;
-use std::cell::RefCell;
-use std::ffi::c_void;
-use std::ops::Deref;
-use std::rc::Rc;
-use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::WindowsAndMessaging::*;
+use iced::widget::{button, column, row, text, text_input};
+use iced::{event, Alignment, Command, Element, Event, Length, Theme};
+use iced_layershell::actions::LayershellCustomActions;
+use iced_layershell::reexport::Anchor;
+use iced_layershell::settings::{LayerShellSettings, Settings};
+use iced_layershell::Application;
 
-#[derive(Default)]
-pub struct BasicApp {
-    window: nwg::Window,
-    name_edit: nwg::TextInput,
-    hello_button: nwg::Button,
+pub fn main() -> Result<(), iced_layershell::Error> {
+    Counter::run(Settings {
+        layer_settings: LayerShellSettings {
+            size: Some((0, 400)),
+            anchor: Anchor::Bottom | Anchor::Right | Anchor::Left,
+            keyboard_interactivity: iced_layershell::reexport::KeyboardInteractivity::None,
+            ..Default::default()
+        },
+        ..Default::default()
+    })
 }
 
-impl BasicApp {
-    fn say_hello(&self) {
-        nwg::modal_info_message(
-            &self.window,
-            "Hello",
-            &format!("Hello {}", self.name_edit.text()),
-        );
+struct Counter {
+    value: i32,
+    text: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum WindowDirection {
+    Top,
+    Left,
+    Right,
+    Bottom,
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+    IncrementPressed,
+    DecrementPressed,
+    TextInput(String),
+    Direction(WindowDirection),
+    IcedEvent(Event),
+}
+
+impl Application for Counter {
+    type Message = Message;
+    type Flags = ();
+    type Theme = Theme;
+    type Executor = iced::executor::Default;
+
+    fn new(_flags: ()) -> (Self, Command<Message>) {
+        (
+            Self {
+                value: 0,
+                text: "eee".to_string(),
+            },
+            Command::none(),
+        )
     }
 
-    fn say_goodbye(&self) {
-        nwg::modal_info_message(
-            &self.window,
-            "Goodbye",
-            &format!("Goodbye {}", self.name_edit.text()),
-        );
-        nwg::stop_thread_dispatch();
+    fn namespace(&self) -> String {
+        String::from("Counter - Iced")
     }
-}
 
-fn remove_border(window: &nwg::Window) {
-    let handle = HWND(window.handle.hwnd().unwrap() as *mut c_void);
-    let style = WINDOW_STYLE(unsafe { GetWindowLongA(handle, GWL_STYLE) } as u32);
-    let new_style = style & !WS_BORDER;
-    unsafe { SetWindowLongA(handle, GWL_STYLE, new_style.0 as i32) };
-}
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        event::listen().map(Message::IcedEvent)
+    }
 
-pub struct BasicAppUi {
-    inner: Rc<BasicApp>,
-    default_handler: RefCell<Option<nwg::EventHandler>>,
-}
-
-impl nwg::NativeUi<BasicAppUi> for BasicApp {
-    fn build_ui(mut data: BasicApp) -> Result<BasicAppUi, nwg::NwgError> {
-        use nwg::Event as E;
-
-        // Controls
-        nwg::Window::builder()
-            .flags(nwg::WindowFlags::VISIBLE | nwg::WindowFlags::WINDOW)
-            .ex_flags((WS_EX_COMPOSITED | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST).0)
-            .topmost(true)
-            .position((300, 300))
-            .build(&mut data.window)?;
-        remove_border(&data.window);
-
-        nwg::TextInput::builder()
-            .size((280, 35))
-            .position((10, 10))
-            .text("Heisenberg")
-            .parent(&data.window)
-            .focus(true)
-            .build(&mut data.name_edit)?;
-
-        nwg::Button::builder()
-            .size((280, 70))
-            .position((10, 50))
-            .text("Say my name")
-            .parent(&data.window)
-            .build(&mut data.hello_button)?;
-
-        // Wrap-up
-        let ui = BasicAppUi {
-            inner: Rc::new(data),
-            default_handler: Default::default(),
-        };
-
-        // Events
-        let evt_ui = Rc::downgrade(&ui.inner);
-        let handle_events = move |evt, _evt_data, handle| {
-            if let Some(ui) = evt_ui.upgrade() {
-                match evt {
-                    E::OnButtonClick => {
-                        if &handle == &ui.hello_button {
-                            BasicApp::say_hello(&ui);
-                        }
-                    }
-                    E::OnWindowClose => {
-                        if &handle == &ui.window {
-                            BasicApp::say_goodbye(&ui);
-                        }
-                    }
-                    _ => {}
-                }
+    fn update(&mut self, message: Message) -> Command<Message> {
+        match message {
+            Message::IcedEvent(event) => {
+                println!("hello {event:?}");
+                Command::none()
             }
-        };
-
-        *ui.default_handler.borrow_mut() = Some(nwg::full_bind_event_handler(
-            &ui.window.handle,
-            handle_events,
-        ));
-
-        return Ok(ui);
-    }
-}
-
-impl Drop for BasicAppUi {
-    /// To make sure that everything is freed without issues, the default handler must be unbound.
-    fn drop(&mut self) {
-        let handler = self.default_handler.borrow();
-        if handler.is_some() {
-            nwg::unbind_event_handler(handler.as_ref().unwrap());
+            Message::IncrementPressed => {
+                self.value += 1;
+                Command::none()
+            }
+            Message::DecrementPressed => {
+                self.value -= 1;
+                Command::none()
+            }
+            Message::TextInput(text) => {
+                self.text = text;
+                Command::none()
+            }
+            Message::Direction(direction) => match direction {
+                WindowDirection::Left => Command::batch(vec![
+                    Command::single(
+                        LayershellCustomActions::AnchorChange(
+                            Anchor::Left | Anchor::Top | Anchor::Bottom,
+                        )
+                        .into(),
+                    ),
+                    Command::single(LayershellCustomActions::SizeChange((400, 0)).into()),
+                ]),
+                WindowDirection::Right => Command::batch(vec![
+                    Command::single(
+                        LayershellCustomActions::AnchorChange(
+                            Anchor::Right | Anchor::Top | Anchor::Bottom,
+                        )
+                        .into(),
+                    ),
+                    Command::single(LayershellCustomActions::SizeChange((400, 0)).into()),
+                ]),
+                WindowDirection::Bottom => Command::batch(vec![
+                    Command::single(
+                        LayershellCustomActions::AnchorChange(
+                            Anchor::Bottom | Anchor::Left | Anchor::Right,
+                        )
+                        .into(),
+                    ),
+                    Command::single(LayershellCustomActions::SizeChange((0, 400)).into()),
+                ]),
+                WindowDirection::Top => Command::batch(vec![
+                    Command::single(
+                        LayershellCustomActions::AnchorChange(
+                            Anchor::Top | Anchor::Left | Anchor::Right,
+                        )
+                        .into(),
+                    ),
+                    Command::single(LayershellCustomActions::SizeChange((0, 400)).into()),
+                ]),
+            },
         }
     }
-}
 
-impl Deref for BasicAppUi {
-    type Target = BasicApp;
-
-    fn deref(&self) -> &BasicApp {
-        &self.inner
+    fn view(&self) -> Element<Message> {
+        let center = column![
+            button("Increment").on_press(Message::IncrementPressed),
+            text(self.value).size(50),
+            button("Decrement").on_press(Message::DecrementPressed)
+        ]
+        .padding(20)
+        .align_items(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill);
+        row![
+            button("left")
+                .on_press(Message::Direction(WindowDirection::Left))
+                .height(Length::Fill),
+            column![
+                button("top")
+                    .on_press(Message::Direction(WindowDirection::Top))
+                    .width(Length::Fill),
+                center,
+                text_input("hello", &self.text)
+                    .on_input(Message::TextInput)
+                    .padding(10),
+                button("bottom")
+                    .on_press(Message::Direction(WindowDirection::Bottom))
+                    .width(Length::Fill),
+            ]
+            .width(Length::Fill),
+            button("right")
+                .on_press(Message::Direction(WindowDirection::Right))
+                .height(Length::Fill),
+        ]
+        .padding(20)
+        .spacing(10)
+        .align_items(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 }
 
-fn main() {
-    nwg::init().expect("Failed to init Native Windows GUI");
-    nwg::Font::set_global_family("Segoe UI").expect("Failed to set default font");
-    let _ui = BasicApp::build_ui(Default::default()).expect("Failed to build UI");
-    nwg::dispatch_thread_events();
-}
