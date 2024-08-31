@@ -18,4 +18,4 @@ anyhow = {workspace = true}
 sea-query = {workspace = true}
 dirs = {workspace = true}
 async-watcher = {workspace = true}
-sysinfo = {workspace = true}
+ctreg = "1.0.2"
