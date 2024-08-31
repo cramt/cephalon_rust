@@ -56,6 +56,8 @@
           ];
 
           buildInputs = with pkgs; [
+            tesseract
+
             openssl
             freetype
 
@@ -135,43 +137,19 @@
           daemon = cephalon_rust_daemon;
         };
         devShells = {
-          default = craneLib.devShell (commonArgsDaemon // {
+          default = craneLib.devShell (commonArgs // {
             packages = with pkgs; [
               bacon
               sqlx-cli
               pkg-config
               rust-analyzer
               rustfmt
-              wineWowPackages.staging
+              tesseract
             ];
             shellHook = ''
+              export TESSERACT_PATH=${pkgs.tesseract}/bin/tesseract
               export $(cat config.env | xargs)
               export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
-            '';
-          });
-          overlay = craneLib.devShell (commonArgsOverlay // {
-            packages = with pkgs; [
-              bacon
-              wineWowPackages.staging
-              rust-analyzer
-              rustfmt
-            ];
-            shellHook = ''
-              export $(cat config.env | xargs)
-              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
-            '';
-          });
-          daemon = craneLib.devShell (commonArgsDaemon // {
-            packages = with pkgs; [
-              bacon
-              sqlx-cli
-              pkg-config
-              rust-analyzer
-              rustfmt
-            ];
-            shellHook = ''
-              export $(cat config.env | xargs)
-              export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgsDaemon.buildInputs}:$LD_LIBRARY_PATH
             '';
           });
         };

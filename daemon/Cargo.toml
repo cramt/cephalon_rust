@@ -19,3 +19,4 @@ sea-query = {workspace = true}
 dirs = {workspace = true}
 async-watcher = {workspace = true}
 ctreg = "1.0.2"
+image = "0.25.2"
