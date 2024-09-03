@@ -106,6 +106,7 @@
               rust-analyzer
               rustfmt
               tesseract
+              cargo-dist
             ];
             shellHook = ''
               export TESSERACT_PATH=${pkgs.tesseract}/bin/tesseract
