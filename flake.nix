@@ -72,38 +72,17 @@
             xorg.libXi
             xorg.libX11
           ];
-
-          # fixes issues related to libring
-          TARGET_CC = "${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/${pkgs.pkgsCross.mingwW64.stdenv.cc.targetPrefix}cc";
-
-          #fixes issues related to openssl
-          OPENSSL_DIR = "${pkgs.openssl.dev}";
-          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
-          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include/";
-
-          depsBuildBuild = with pkgs; [
-            pkgsCross.mingwW64.stdenv.cc
-            pkgsCross.mingwW64.windows.pthreads
-          ];
-
         };
 
 
-        commonArgsDaemon = commonArgs // {
-          pname = "cephalon_rust_daemon";
-          src = src;
-          cargoExtraArgs = "-p cephalon_rust_daemon";
-          version = "0.1.0";
-        };
-
-        cargoArtifactsDaemon = craneLib.buildDepsOnly commonArgsDaemon;
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
-        cephalon_rust_daemon = craneLib.buildPackage (commonArgsDaemon // {
-          inherit cargoArtifactsDaemon;
+        cephalon_rust = craneLib.buildPackage (commonArgs // {
+          inherit cargoArtifacts;
 
-          nativeBuildInputs = (commonArgsDaemon.nativeBuildInputs or [ ]) ++ [
+          nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
             pkgs.sqlx-cli
           ];
 
@@ -113,27 +92,10 @@
             sqlx migrate run
           '';
         });
-
-        commonArgsOverlay = commonArgs // {
-          pname = "cephalon_rust_overlay";
-          src = craneLib.cleanCargoSource ./.;
-          cargoExtraArgs = "-p cephalon_rust_overlay";
-          version = "0.1.0";
-        };
-
-        cargoArtifactsOverlay = craneLib.buildDepsOnly commonArgsOverlay;
-
-        cephalon_rust_overlay = craneLib.buildPackage (commonArgsOverlay // {
-          inherit cargoArtifactsOverlay;
-
-          strictDeps = true;
-          doCheck = false;
-        });
       in
       {
         packages = {
-          overlay = cephalon_rust_overlay;
-          daemon = cephalon_rust_daemon;
+          default = cephalon_rust;
         };
         devShells = {
           default = craneLib.devShell (commonArgs // {
