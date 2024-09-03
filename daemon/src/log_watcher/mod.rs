@@ -56,7 +56,7 @@ async fn raw_watcher() -> Result<
 }
 
 regex! { LogEntryParser = r#"(?:\d+\.\d+ )?(?<system>[A-z]+) \[(?<level>[A-z]+)\]: (?<rest>.*)"# }
-regex! { LogScriptEntryParser = r#"(?<script>[A-z]+\.lua: (?<rest>.*))"# }
+regex! { LogScriptEntryParser = r#"(?<script>[A-z]+)\.lua: (?<rest>.*)"# }
 
 #[derive(Debug)]
 pub enum LogEntry {
