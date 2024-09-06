@@ -9,11 +9,12 @@ regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])[a-z]"# }
 use crate::ocr;
 
 pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<String>> {
-    let width = 1920u32;
+    let width = img.width();
+    let height = img.height();
     let middle = width / 2;
-    let frame_width = 243u32;
-    let frame_bottom = 460u32;
-    let text_height = 24u32;
+    let frame_width = (width * 243) / 1920;
+    let frame_bottom = (height * 460) / 1080;
+    let text_height = (height * 24) / 1080;
     let start_points = match amount {
         4 => [
             Some(middle - frame_width * 2),

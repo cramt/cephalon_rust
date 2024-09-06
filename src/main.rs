@@ -18,6 +18,9 @@ async fn main() -> anyhow::Result<()> {
         .into_iter()
         .find(|x| x.title() == "Warframe")
         .ok_or(anyhow!("warframe not running"))?;
+    let image = warframe.capture_image().unwrap();
+    let image = DynamicImage::ImageRgba8(image);
+    image.save("initial_test.png").unwrap();
     let mut reciever = watcher().await;
 
     while let Some(entry) = reciever.recv().await {
@@ -28,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
                         println!("At reward screen");
                         let image = warframe.capture_image().unwrap();
                         let image = DynamicImage::ImageRgba8(image);
+                        image.save("reward_capture.png").unwrap();
                         let results = parse_relic_screen(&image, 4).await;
                         println!("{results:?}");
                     }

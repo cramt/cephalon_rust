@@ -70,6 +70,7 @@
             xorg.libXcursor
             xorg.libXrandr
             xorg.libXi
+            xorg.libxcb
             xorg.libX11
           ];
         };
