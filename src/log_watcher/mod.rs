@@ -64,12 +64,17 @@ pub enum LogEntry {
     SysWarning(String),
     SysError(String),
     NetInfo(String),
+    NetError(String),
     PhysInfo(String),
+    PhysWarning(String),
+    PhysError(String),
     SndInfo(String),
     GfxInfo(String),
     InputInfo(String),
     AIInfo(String),
     GameInfo(String),
+    GameWarning(String),
+    AnimInfo(String),
     ScriptInfo { script: String, content: String },
 }
 
@@ -87,12 +92,17 @@ impl FromStr for LogEntry {
             ("Sys", "Warning") => Ok(Self::SysWarning(rest.to_string())),
             ("Sys", "Error") => Ok(Self::SysError(rest.to_string())),
             ("Net", "Info") => Ok(Self::NetInfo(rest.to_string())),
+            ("Net", "Error") => Ok(Self::NetError(rest.to_string())),
             ("Phys", "Info") => Ok(Self::PhysInfo(rest.to_string())),
+            ("Phys", "Warning") => Ok(Self::PhysWarning(rest.to_string())),
+            ("Phys", "Error") => Ok(Self::PhysError(rest.to_string())),
             ("Snd", "Info") => Ok(Self::SndInfo(rest.to_string())),
             ("Gfx", "Info") => Ok(Self::GfxInfo(rest.to_string())),
             ("Input", "Info") => Ok(Self::InputInfo(rest.to_string())),
             ("AI", "Info") => Ok(Self::AIInfo(rest.to_string())),
             ("Game", "Info") => Ok(Self::GameInfo(rest.to_string())),
+            ("Game", "Warning") => Ok(Self::GameWarning(rest.to_string())),
+            ("Anim", "Info") => Ok(Self::AnimInfo(rest.to_string())),
             ("Script", "Info") => {
                 let captures = LogScriptEntryParser::new().captures(rest).ok_or(())?;
                 Ok(Self::ScriptInfo {
