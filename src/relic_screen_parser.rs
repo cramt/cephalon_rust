@@ -4,7 +4,7 @@ use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
 use image::DynamicImage;
 
-regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])[a-z]"# }
+regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
 use crate::ocr;
 
@@ -46,6 +46,7 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<St
                         frame_width,
                         text_height,
                     );
+                    new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
                     let result = ocr(new).await.ok()?;
                     let res = result.trim();
                     if res.is_empty() {
@@ -55,6 +56,8 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<St
                     }
                 }
                 let finder = CapitalFinder::new();
+                let mut buffer = buffer.replace("Primie", "Prime"); //TODO: bad solution, get
+                                                                    //tesseract to act better
                 loop {
                     if let Some(res) = finder.captures(buffer.as_str()) {
                         buffer.insert_str(res.capital.start, " ")
@@ -68,4 +71,29 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<St
         .collect::<FuturesOrdered<_>>()
         .collect::<Vec<_>>()
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use image::ImageReader;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn _1() {
+        let img = ImageReader::open("test_rewards_screens/1.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        let result = parse_relic_screen(&img, 4).await;
+        assert_eq!(
+            result,
+            vec![
+                Some("2 X Forma Blueprint".to_string()),
+                Some("Okina Prime Handle".to_string()),
+                Some("Baruuk Prime Chassis Blueprint".to_string()),
+                Some("Shade Prime Systems".to_string())
+            ]
+        );
+    }
 }

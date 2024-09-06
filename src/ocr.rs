@@ -10,7 +10,7 @@ pub async fn ocr(img: DynamicImage) -> anyhow::Result<String> {
         .arg("stdin")
         .arg("stdout")
         .arg("-c")
-        .arg("tessedit_char_whitelist=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        .arg("tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         .stdout(Stdio::piped())
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
