@@ -36,25 +36,6 @@ pub fn get_default_path() -> PathBuf {
         .collect()
 }
 
-async fn raw_watcher() -> Result<
-    tokio::sync::mpsc::Receiver<
-        Result<Vec<async_watcher::DebouncedEvent>, Vec<async_watcher::notify::Error>>,
-    >,
-    anyhow::Error,
-> {
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
-    let mut debouncer = AsyncDebouncer::new(
-        Duration::from_millis(100),
-        Some(Duration::from_millis(100)),
-        tx,
-    )
-    .await?;
-    debouncer
-        .watcher()
-        .watch(&get_default_path(), RecursiveMode::Recursive)?;
-    Ok(rx)
-}
-
 regex! { LogEntryParser = r#"(?:\d+\.\d+ )?(?<system>[A-z]+) \[(?<level>[A-z]+)\]: (?<rest>.*)"# }
 regex! { LogScriptEntryParser = r#"(?<script>[A-z]+)\.lua: (?<rest>.*)"# }
 
