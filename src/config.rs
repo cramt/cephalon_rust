@@ -1,7 +1,7 @@
-use std::time::Duration;
+use std::{ops::Deref, path::PathBuf, time::Duration};
 
-use sqlx::{Pool, Sqlite, SqlitePool};
 use tokio::{
+    fs::create_dir_all,
     sync::{OnceCell, Semaphore},
     time::sleep,
 };
@@ -56,31 +56,23 @@ pub async fn client() -> &'static ClientWithMiddleware {
 pub struct Settings {
     pub database_url: String,
     pub tesseract_path: String,
+    pub cache_path: PathBuf,
 }
 
 pub async fn settings() -> &'static Settings {
     static ONCE: OnceCell<Settings> = OnceCell::const_new();
 
-    ONCE.get_or_init(|| async {
-        config::Config::builder()
-            .add_source(config::Environment::default())
-            .build()
-            .unwrap()
-            .try_deserialize()
-            .unwrap()
-    })
-    .await
-}
+    let result = ONCE
+        .get_or_init(|| async {
+            config::Config::builder()
+                .add_source(config::Environment::default())
+                .build()
+                .unwrap()
+                .try_deserialize()
+                .unwrap()
+        })
+        .await;
+    create_dir_all(result.cache_path.deref()).await.unwrap();
 
-pub async fn db_conn() -> &'static Pool<Sqlite> {
-    static ONCE: OnceCell<Pool<Sqlite>> = OnceCell::const_new();
-
-    ONCE.get_or_init(|| async {
-        let pool = SqlitePool::connect(&settings().await.database_url)
-            .await
-            .unwrap();
-        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-        pool
-    })
-    .await
+    result
 }

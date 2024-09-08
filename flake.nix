@@ -26,7 +26,6 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        inherit (pkgs) lib;
 
         toolchain = with fenix.packages.${system};
           combine [
@@ -37,15 +36,6 @@
           ];
 
         craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
-
-        sqlFilter = path: _type: null != builtins.match ".*sql$" path;
-        sqlOrCargo = path: type: (sqlFilter path type) || (craneLib.filterCargoSources path type);
-
-        src = lib.cleanSourceWith {
-          src = ./.;
-          filter = sqlOrCargo;
-          name = "source";
-        };
 
         commonArgs = {
           strictDeps = true;
@@ -82,16 +72,6 @@
         # artifacts from above.
         cephalon_rust = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
-
-          nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-            pkgs.sqlx-cli
-          ];
-
-          preBuild = ''
-            export DATABASE_URL=sqlite:./db.sqlite3
-            sqlx database create
-            sqlx migrate run
-          '';
         });
       in
       {
@@ -102,7 +82,6 @@
           default = craneLib.devShell (commonArgs // {
             packages = with pkgs; [
               bacon
-              sqlx-cli
               pkg-config
               rust-analyzer
               rustfmt

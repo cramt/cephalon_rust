@@ -8,6 +8,7 @@ use crate::{
 
 use super::item_identifiers::ItemIdentifier;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Relic {
     pub id: String,
     pub id_name: String,

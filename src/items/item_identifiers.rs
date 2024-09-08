@@ -5,7 +5,7 @@ use crate::{
     items::{ItemsWrapper, Payload},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ItemIdentifier {
     Relic { id_name: String },
     Item { id_name: String },

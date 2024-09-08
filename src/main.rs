@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use image::DynamicImage;
+use items::{item_identifiers, relics};
 use log_watcher::{watcher, LogEntry};
 use ocr::ocr;
 use relic_screen_parser::parse_relic_screen;
@@ -16,6 +17,11 @@ pub mod relic_screen_parser;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    println!("{:?}", item_identifiers().await);
+    println!("{:?}", relics().await);
+
+    return Ok(());
+
     let windows = Window::all()?;
     let warframe = windows
         .into_iter()
