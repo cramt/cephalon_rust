@@ -4,8 +4,15 @@ use iced_layershell::actions::LayershellCustomActions;
 use iced_layershell::reexport::Anchor;
 use iced_layershell::settings::{LayerShellSettings, Settings};
 use iced_layershell::Application;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::sync::Arc;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::RwLock;
 
-pub fn main() -> Result<(), iced_layershell::Error> {
+#[tokio::main]
+async fn main() -> Result<(), iced_layershell::Error> {
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
     Counter::run(Settings {
         layer_settings: LayerShellSettings {
             size: Some((0, 400)),
@@ -13,43 +20,37 @@ pub fn main() -> Result<(), iced_layershell::Error> {
             keyboard_interactivity: iced_layershell::reexport::KeyboardInteractivity::None,
             ..Default::default()
         },
+        flags: Some(rx),
         ..Default::default()
-    })
+    })?;
+    println!("test");
+
+    Ok(())
 }
 
 struct Counter {
     value: i32,
-    text: String,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum WindowDirection {
-    Top,
-    Left,
-    Right,
-    Bottom,
+    rx: RwLock<Receiver<()>>,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     IncrementPressed,
     DecrementPressed,
-    TextInput(String),
-    Direction(WindowDirection),
     IcedEvent(Event),
 }
 
 impl Application for Counter {
     type Message = Message;
-    type Flags = ();
+    type Flags = Option<Receiver<()>>;
     type Theme = Theme;
     type Executor = iced::executor::Default;
 
-    fn new(_flags: ()) -> (Self, Command<Message>) {
+    fn new(flags: Option<Receiver<()>>) -> (Self, Command<Message>) {
         (
             Self {
+                rx: RwLock::new(flags.unwrap()),
                 value: 0,
-                text: "eee".to_string(),
             },
             Command::none(),
         )
@@ -60,7 +61,10 @@ impl Application for Counter {
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
-        event::listen().map(Message::IcedEvent)
+        iced::subscription::unfold("led changes", (), move |_| async move {
+            let num = self.rx.read().await.recv().await;
+            (Message::IncrementPressed, ())
+        })
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -77,48 +81,6 @@ impl Application for Counter {
                 self.value -= 1;
                 Command::none()
             }
-            Message::TextInput(text) => {
-                self.text = text;
-                Command::none()
-            }
-            Message::Direction(direction) => match direction {
-                WindowDirection::Left => Command::batch(vec![
-                    Command::single(
-                        LayershellCustomActions::AnchorChange(
-                            Anchor::Left | Anchor::Top | Anchor::Bottom,
-                        )
-                        .into(),
-                    ),
-                    Command::single(LayershellCustomActions::SizeChange((400, 0)).into()),
-                ]),
-                WindowDirection::Right => Command::batch(vec![
-                    Command::single(
-                        LayershellCustomActions::AnchorChange(
-                            Anchor::Right | Anchor::Top | Anchor::Bottom,
-                        )
-                        .into(),
-                    ),
-                    Command::single(LayershellCustomActions::SizeChange((400, 0)).into()),
-                ]),
-                WindowDirection::Bottom => Command::batch(vec![
-                    Command::single(
-                        LayershellCustomActions::AnchorChange(
-                            Anchor::Bottom | Anchor::Left | Anchor::Right,
-                        )
-                        .into(),
-                    ),
-                    Command::single(LayershellCustomActions::SizeChange((0, 400)).into()),
-                ]),
-                WindowDirection::Top => Command::batch(vec![
-                    Command::single(
-                        LayershellCustomActions::AnchorChange(
-                            Anchor::Top | Anchor::Left | Anchor::Right,
-                        )
-                        .into(),
-                    ),
-                    Command::single(LayershellCustomActions::SizeChange((0, 400)).into()),
-                ]),
-            },
         }
     }
 
@@ -132,33 +94,12 @@ impl Application for Counter {
         .align_items(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill);
-        row![
-            button("left")
-                .on_press(Message::Direction(WindowDirection::Left))
-                .height(Length::Fill),
-            column![
-                button("top")
-                    .on_press(Message::Direction(WindowDirection::Top))
-                    .width(Length::Fill),
-                center,
-                text_input("hello", &self.text)
-                    .on_input(Message::TextInput)
-                    .padding(10),
-                button("bottom")
-                    .on_press(Message::Direction(WindowDirection::Bottom))
-                    .width(Length::Fill),
-            ]
-            .width(Length::Fill),
-            button("right")
-                .on_press(Message::Direction(WindowDirection::Right))
-                .height(Length::Fill),
-        ]
-        .padding(20)
-        .spacing(10)
-        .align_items(Alignment::Center)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        row![column![center,].width(Length::Fill),]
+            .padding(20)
+            .spacing(10)
+            .align_items(Alignment::Center)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 }
-

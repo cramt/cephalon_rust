@@ -6,6 +6,9 @@ description = "ordis' more helpful brother"
 repository = "https://github.com/cramt/cephalon_rust"
 authors = ["cramt"]
 
+[workspace]
+exclude = ["overlay"]
+
 [package.metadata.wix]
 upgrade-guid = "E184F713-AF0A-4C28-BABC-2A3644AF8523"
 path-guid = "53883E5E-DF81-4065-AEF0-4E4D5B0A764D"
