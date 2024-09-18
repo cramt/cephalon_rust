@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use image::DynamicImage;
-use items::{item_identifiers, relics};
+use items::{item_identifiers, items::fetch_items, relics};
 use log_watcher::{watcher, LogEntry};
 use ocr::ocr;
 use relic_screen_parser::parse_relic_screen;
@@ -17,8 +17,7 @@ pub mod relic_screen_parser;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("{:?}", item_identifiers().await);
-    println!("{:?}", relics().await);
+    println!("{:?}", fetch_items(item_identifiers().await).await);
 
     return Ok(());
 

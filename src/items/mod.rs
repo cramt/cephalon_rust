@@ -1,4 +1,5 @@
 pub mod item_identifiers;
+pub mod items;
 pub mod relics;
 
 use std::{
@@ -9,6 +10,7 @@ use std::{
 };
 
 use item_identifiers::{get_item_identifiers, ItemIdentifier};
+use items::{fetch_items, Item};
 use relics::{fetch_relics, Relic};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{io::AsyncReadExt, sync::OnceCell};
@@ -82,7 +84,21 @@ pub async fn relics() -> &'static Vec<Relic> {
     let static_ref = ONCE
         .get_or_init(|| async {
             cache_in_file(settings().await.cache_path.join("relics.json"), || async {
-                fetch_relics(&get_item_identifiers().await.ok()?).await.ok()
+                fetch_relics(item_identifiers().await).await.ok()
+            })
+            .await
+            .unwrap()
+        })
+        .await;
+    static_ref
+}
+
+pub async fn items() -> &'static Vec<Item> {
+    static ONCE: OnceCell<Vec<Item>> = OnceCell::const_new();
+    let static_ref = ONCE
+        .get_or_init(|| async {
+            cache_in_file(settings().await.cache_path.join("items.json"), || async {
+                fetch_items(item_identifiers().await).await.ok()
             })
             .await
             .unwrap()
