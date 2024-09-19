@@ -96,4 +96,30 @@ mod tests {
             ]
         );
     }
+
+    #[tokio::test]
+    async fn _2() {
+        async fn inner_test(img: &DynamicImage) {
+            let result = parse_relic_screen(&img, 4).await;
+            assert_eq!(
+                result,
+                vec![
+                    Some("Burston Prime Receiver".to_string()),
+                    Some("Oberon Prime Blueprint".to_string()),
+                    Some("Sybarus Prime Blueprint".to_string()),
+                    Some("Lex Prime Receiver".to_string())
+                ]
+            );
+        }
+        let img = ImageReader::open("test_rewards_screens/2a.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        inner_test(&img).await;
+        let img = ImageReader::open("test_rewards_screens/2b.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        inner_test(&img).await;
+    }
 }
