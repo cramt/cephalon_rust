@@ -14,7 +14,7 @@ use item_identifiers::{get_item_identifiers, ItemIdentifier};
 use items::{fetch_items_and_sets, Item, ItemSet};
 use relics::{fetch_relics, Relic};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::{io::AsyncReadExt, sync::OnceCell};
+use tokio::sync::OnceCell;
 
 use crate::config::settings;
 

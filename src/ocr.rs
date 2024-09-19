@@ -1,7 +1,7 @@
 use std::{io::Cursor, process::Stdio};
 
 use image::DynamicImage;
-use tokio::{io::AsyncWriteExt, process::Command};
+use tokio::process::Command;
 
 use crate::config::settings;
 

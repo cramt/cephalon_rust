@@ -40,16 +40,16 @@ impl Middleware for RateLimittingMiddleware {
 
 pub async fn client() -> &'static ClientWithMiddleware {
     static ONCE: OnceCell<ClientWithMiddleware> = OnceCell::const_new();
-    let static_ref = ONCE
+
+    (ONCE
         .get_or_init(|| async {
             let reqwest_client = Client::builder().build().unwrap();
-            let client = ClientBuilder::new(reqwest_client)
+
+            ClientBuilder::new(reqwest_client)
                 .with(RateLimittingMiddleware)
-                .build();
-            client
+                .build()
         })
-        .await;
-    static_ref
+        .await) as _
 }
 
 #[derive(serde::Deserialize)]

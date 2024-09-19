@@ -1,14 +1,23 @@
-use std::convert::identity;
+use std::collections::HashMap;
 
 use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
 use image::DynamicImage;
+use tokio::sync::OnceCell;
 
 regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
-use crate::ocr;
+use crate::items::items;
+use crate::{items::items::Item, ocr};
 
-pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<String>> {
+async fn items_by_identifier() -> &'static HashMap<&'static str, &'static Item> {
+    static ONCE: OnceCell<HashMap<&'static str, &'static Item>> = OnceCell::const_new();
+    (ONCE
+        .get_or_init(|| async { items().await.iter().map(|(_, x)| (&*x.name, x)).collect() })
+        .await) as _
+}
+
+pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'static Item>> {
     let width = img.width();
     let height = img.height();
     let middle = width / 2;
@@ -34,7 +43,7 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<St
     };
     start_points
         .into_iter()
-        .filter_map(identity)
+        .flatten()
         .map(|p| {
             let mut img = img.clone();
             async move {
@@ -56,16 +65,29 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<St
                     }
                 }
                 let finder = CapitalFinder::new();
-                let mut buffer = buffer.replace("Primie", "Prime"); //TODO: bad solution, get
-                                                                    //tesseract to act better
-                loop {
-                    if let Some(res) = finder.captures(buffer.as_str()) {
-                        buffer.insert_str(res.capital.start, " ")
-                    } else {
-                        break;
-                    }
+                let mut buffer = buffer
+                    .replace("Primie", "Prime")
+                    .replace("Bursten", "Burston")
+                    .replace("Recelver", "Receiver"); //TODO: bad solution, get
+                                                      //tesseract to act better
+                while let Some(res) = finder.captures(buffer.as_str()) {
+                    buffer.insert(res.capital.start, ' ')
                 }
-                Some(buffer)
+
+                let mut items = items_by_identifier()
+                    .await
+                    .iter()
+                    .filter(|(k, _)| buffer.contains(*k))
+                    .map(|(_, v)| v)
+                    .take(2);
+                let first = items.next();
+                let second = items.next();
+                let item = match (first, second) {
+                    (Some(item), None) => Some(*item),
+                    _ => None,
+                };
+                println!("{buffer:?} = {item:?}");
+                item
             }
         })
         .collect::<FuturesOrdered<_>>()
@@ -79,47 +101,66 @@ mod tests {
 
     use super::*;
 
+    async fn assert(img: &DynamicImage, rhs: Vec<Option<String>>) {
+        let result = parse_relic_screen(img, 4)
+            .await
+            .into_iter()
+            .map(|x| x.map(|y| y.name.to_string()))
+            .collect::<Vec<_>>();
+        assert_eq!(result, rhs);
+    }
+
     #[tokio::test]
     async fn _1() {
         let img = ImageReader::open("test_rewards_screens/1.png")
             .unwrap()
             .decode()
             .unwrap();
-        let result = parse_relic_screen(&img, 4).await;
-        assert_eq!(
-            result,
+        assert(
+            &img,
             vec![
-                Some("2 X Forma Blueprint".to_string()),
+                None,
                 Some("Okina Prime Handle".to_string()),
                 Some("Baruuk Prime Chassis Blueprint".to_string()),
-                Some("Shade Prime Systems".to_string())
-            ]
-        );
+                Some("Shade Prime Systems".to_string()),
+            ],
+        )
+        .await;
     }
 
     #[tokio::test]
-    async fn _2() {
-        async fn inner_test(img: &DynamicImage) {
-            let result = parse_relic_screen(&img, 4).await;
-            assert_eq!(
-                result,
-                vec![
-                    Some("Burston Prime Receiver".to_string()),
-                    Some("Oberon Prime Blueprint".to_string()),
-                    Some("Sybarus Prime Blueprint".to_string()),
-                    Some("Lex Prime Receiver".to_string())
-                ]
-            );
-        }
+    async fn _2a() {
         let img = ImageReader::open("test_rewards_screens/2a.png")
             .unwrap()
             .decode()
             .unwrap();
-        inner_test(&img).await;
+        assert(
+            &img,
+            vec![
+                Some("Sybaris Prime Blueprint".to_string()),
+                Some("Oberon Prime Blueprint".to_string()),
+                Some("Burston Prime Receiver".to_string()),
+                Some("Lex Prime Receiver".to_string()),
+            ],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn _2b() {
         let img = ImageReader::open("test_rewards_screens/2b.png")
             .unwrap()
             .decode()
             .unwrap();
-        inner_test(&img).await;
+        assert(
+            &img,
+            vec![
+                Some("Burston Prime Receiver".to_string()),
+                Some("Oberon Prime Blueprint".to_string()),
+                Some("Sybaris Prime Blueprint".to_string()),
+                Some("Lex Prime Receiver".to_string()),
+            ],
+        )
+        .await;
     }
 }

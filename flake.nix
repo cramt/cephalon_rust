@@ -26,16 +26,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-
-        toolchain = with fenix.packages.${system};
-          combine [
-            minimal.rustc
-            minimal.cargo
-            targets.x86_64-unknown-linux-gnu.latest.rust-std
-            targets.x86_64-pc-windows-gnu.latest.rust-std
-          ];
-
-        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+        craneLib = crane.mkLib pkgs;
 
         commonArgs = {
           strictDeps = true;

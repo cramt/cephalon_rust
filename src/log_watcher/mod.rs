@@ -1,6 +1,5 @@
 use std::{ffi::OsStr, io::SeekFrom, path::PathBuf, str::FromStr, time::Duration};
 
-use async_watcher::{notify::RecursiveMode, AsyncDebouncer};
 use ctreg::regex;
 use tokio::{
     fs::File,
