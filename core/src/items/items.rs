@@ -8,7 +8,7 @@ use crate::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemSet {
     pub id: String,
     pub id_name: String,
@@ -16,7 +16,7 @@ pub struct ItemSet {
     pub part_ids: HashSet<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub id: String,
     pub id_name: String,

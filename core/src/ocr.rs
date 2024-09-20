@@ -1,10 +1,21 @@
-use std::{io::Cursor, process::Stdio};
+use std::{io::Cursor, path::Path, process::Stdio};
 use tokio::io::AsyncWriteExt;
 
 use image::DynamicImage;
 use tokio::process::Command;
 
 use crate::config::settings;
+
+pub async fn validate_path(path: &Path) -> bool {
+    Command::new(path)
+        .stdout(Stdio::null())
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|x| x.success())
+        .unwrap_or(false)
+}
 
 pub async fn ocr(img: DynamicImage) -> anyhow::Result<String> {
     let mut process = Command::new(settings().await.tesseract_path.as_str())

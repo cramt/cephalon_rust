@@ -54,7 +54,6 @@ pub async fn client() -> &'static ClientWithMiddleware {
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
-    pub database_url: String,
     pub tesseract_path: String,
     pub cache_path: PathBuf,
 }

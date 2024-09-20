@@ -56,7 +56,7 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'
                         text_height,
                     );
                     new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
-                    let result = ocr(new).await.ok()?;
+                    let result = ocr::ocr(new).await.ok()?;
                     let res = result.trim();
                     if res.is_empty() {
                         break;
