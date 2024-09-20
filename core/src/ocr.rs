@@ -4,8 +4,6 @@ use tokio::io::AsyncWriteExt;
 use image::DynamicImage;
 use tokio::process::Command;
 
-use crate::config::settings;
-
 pub async fn validate_path(path: &Path) -> bool {
     Command::new(path)
         .stdout(Stdio::null())
@@ -17,8 +15,8 @@ pub async fn validate_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn ocr(img: DynamicImage) -> anyhow::Result<String> {
-    let mut process = Command::new(settings().await.tesseract_path.as_str())
+pub async fn ocr(img: DynamicImage, tesseract_path: &Path) -> anyhow::Result<String> {
+    let mut process = Command::new(tesseract_path)
         .arg("stdin")
         .arg("stdout")
         .arg("-c")

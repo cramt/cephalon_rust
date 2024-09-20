@@ -1,23 +1,20 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
 use image::DynamicImage;
-use tokio::sync::OnceCell;
 
 regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
-use crate::items::items;
 use crate::{items::items::Item, ocr};
 
-async fn items_by_identifier() -> &'static HashMap<&'static str, &'static Item> {
-    static ONCE: OnceCell<HashMap<&'static str, &'static Item>> = OnceCell::const_new();
-    (ONCE
-        .get_or_init(|| async { items().await.iter().map(|(_, x)| (&*x.name, x)).collect() })
-        .await) as _
-}
-
-pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'static Item>> {
+pub async fn parse_relic_screen<'a>(
+    img: &DynamicImage,
+    amount: u8,
+    tesseract_path: &Path,
+    items: &HashMap<String, Item>,
+) -> Vec<Option<Item>> {
     let width = img.width();
     let height = img.height();
     let middle = width / 2;
@@ -56,7 +53,7 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'
                         text_height,
                     );
                     new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
-                    let result = ocr::ocr(new).await.ok()?;
+                    let result = ocr::ocr(new, tesseract_path).await.ok()?;
                     let res = result.trim();
                     if res.is_empty() {
                         break;
@@ -74,20 +71,19 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'
                     buffer.insert(res.capital.start, ' ')
                 }
 
-                let mut items = items_by_identifier()
-                    .await
+                let mut items = items
                     .iter()
-                    .filter(|(k, _)| buffer.contains(*k))
+                    .filter(|(_, v)| buffer.contains(&v.name))
                     .map(|(_, v)| v)
                     .take(2);
                 let first = items.next();
                 let second = items.next();
                 let item = match (first, second) {
-                    (Some(item), None) => Some(*item),
+                    (Some(item), None) => Some(item),
                     _ => None,
                 };
                 println!("{buffer:?} = {item:?}");
-                item
+                item.cloned()
             }
         })
         .collect::<FuturesOrdered<_>>()
@@ -97,12 +93,24 @@ pub async fn parse_relic_screen(img: &DynamicImage, amount: u8) -> Vec<Option<&'
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use image::ImageReader;
+
+    use crate::items::{cached_get_item_identifiers, cached_items_and_sets};
 
     use super::*;
 
     async fn assert(img: &DynamicImage, rhs: Vec<Option<String>>) {
-        let result = parse_relic_screen(img, 4)
+        let cache_path = env::var("CACHE_PATH").unwrap();
+        let cache_path = Path::new(&cache_path);
+        let tes = env::var("TESSERACT_PATH").unwrap();
+        let tes = Path::new(&tes);
+        let item_identifiers = cached_get_item_identifiers(cache_path).await.unwrap();
+        let (items, _) = cached_items_and_sets(cache_path, &item_identifiers)
+            .await
+            .unwrap();
+        let result = parse_relic_screen(img, 4, tes, &items)
             .await
             .into_iter()
             .map(|x| x.map(|y| y.name.to_string()))

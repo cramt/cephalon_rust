@@ -1,10 +1,13 @@
 #![allow(clippy::single_match)]
 
 use image::DynamicImage;
+use items::{
+    cached_get_item_identifiers, cached_items_and_sets, items::Item, CacheError, ReqwestSerdeError,
+};
 use log_watcher::{watcher, LogEntry};
 use relic_screen_parser::parse_relic_screen;
 use state::State;
-use std::{path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 use thiserror::Error;
 use tokio::{
     fs::create_dir_all,
@@ -25,7 +28,7 @@ pub mod state;
 
 pub struct Engine {
     tesseract_path: PathBuf,
-    cache_path: PathBuf,
+    items: HashMap<String, Item>,
     debug: bool,
 }
 
@@ -35,6 +38,8 @@ pub enum EngineCreateError {
     CreateCachePathError(#[from] std::io::Error),
     #[error("invalid tesseract")]
     InvalidTesseract,
+    #[error("create cache path error")]
+    FetchError(#[from] CacheError<ReqwestSerdeError>),
 }
 
 #[derive(Error, Debug)]
@@ -59,9 +64,11 @@ impl Engine {
         if !valid_path {
             return Err(EngineCreateError::InvalidTesseract);
         }
+        let item_identifiers = cached_get_item_identifiers(&cache_path).await?;
+        let (items, _sets) = cached_items_and_sets(&cache_path, &item_identifiers).await?;
         Ok(Self {
             tesseract_path,
-            cache_path,
+            items,
             debug,
         })
     }
@@ -83,16 +90,20 @@ impl Engine {
         let relic_screen_enabler = {
             let (tx, mut rx) = tokio::sync::mpsc::channel::<oneshot::Receiver<()>>(100);
 
+            let tesseract_path = self.tesseract_path.clone();
+            let debug = self.debug;
+
             tokio::spawn(async move {
                 while let Some(mut stopper) = rx.recv().await {
                     while matches!(stopper.try_recv(), Err(TryRecvError::Empty)) {
                         sleep(Duration::from_millis(300)).await;
                         let image = warframe.capture_image().unwrap();
                         let image = DynamicImage::ImageRgba8(image);
-                        if self.debug {
+                        if debug {
                             image.save("reward_capture.png").unwrap();
                         }
-                        let results = parse_relic_screen(&image, 4).await;
+                        let results =
+                            parse_relic_screen(&image, 4, &tesseract_path, &self.items).await;
                         let finished = results.iter().filter(|x| x.is_some()).count() == 4;
                         let _ = sender
                             .send(State {

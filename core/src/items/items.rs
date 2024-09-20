@@ -8,6 +8,8 @@ use crate::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 
+use super::ReqwestSerdeError;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemSet {
     pub id: String,
@@ -29,7 +31,7 @@ pub struct Item {
 
 pub async fn fetch_items_and_sets(
     identifiers: &Vec<ItemIdentifier>,
-) -> Result<(HashMap<String, Item>, HashMap<String, ItemSet>), anyhow::Error> {
+) -> Result<(HashMap<String, Item>, HashMap<String, ItemSet>), ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
     pub struct MessageInner2 {
         item_name: String,
@@ -97,7 +99,7 @@ pub async fn fetch_items_and_sets(
         .collect::<Vec<_>>()
         .await
         .into_iter()
-        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+        .collect::<Result<Vec<_>, ReqwestSerdeError>>()?;
 
     Ok(items.into_iter().fold(
         (HashMap::new(), HashMap::new()),

@@ -6,7 +6,7 @@ use crate::{
     items::{ItemWrapper, Payload},
 };
 
-use super::item_identifiers::ItemIdentifier;
+use super::{item_identifiers::ItemIdentifier, ReqwestSerdeError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Relic {
@@ -18,7 +18,9 @@ pub struct Relic {
     pub trading_tax: u32,
 }
 
-pub async fn fetch_relics(identifiers: &Vec<ItemIdentifier>) -> Result<Vec<Relic>, anyhow::Error> {
+pub async fn fetch_relics(
+    identifiers: &Vec<ItemIdentifier>,
+) -> Result<Vec<Relic>, ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
     pub struct MessageInner2 {
         item_name: String,
@@ -58,7 +60,7 @@ pub async fn fetch_relics(identifiers: &Vec<ItemIdentifier>) -> Result<Vec<Relic
         .collect::<Vec<_>>()
         .await
         .into_iter()
-        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+        .collect::<Result<Vec<_>, ReqwestSerdeError>>()?;
     Ok(relics
         .into_iter()
         .flat_map(|mut x| {

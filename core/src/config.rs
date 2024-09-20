@@ -1,7 +1,6 @@
-use std::{ops::Deref, path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use tokio::{
-    fs::create_dir_all,
     sync::{OnceCell, Semaphore},
     time::sleep,
 };
@@ -50,28 +49,4 @@ pub async fn client() -> &'static ClientWithMiddleware {
                 .build()
         })
         .await) as _
-}
-
-#[derive(serde::Deserialize)]
-pub struct Settings {
-    pub tesseract_path: String,
-    pub cache_path: PathBuf,
-}
-
-pub async fn settings() -> &'static Settings {
-    static ONCE: OnceCell<Settings> = OnceCell::const_new();
-
-    let result = ONCE
-        .get_or_init(|| async {
-            config::Config::builder()
-                .add_source(config::Environment::default())
-                .build()
-                .unwrap()
-                .try_deserialize()
-                .unwrap()
-        })
-        .await;
-    create_dir_all(result.cache_path.deref()).await.unwrap();
-
-    result
 }

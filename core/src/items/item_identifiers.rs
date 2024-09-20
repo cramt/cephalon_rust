@@ -5,13 +5,15 @@ use crate::{
     items::{ItemsWrapper, Payload},
 };
 
+use super::ReqwestSerdeError;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ItemIdentifier {
     Relic { id_name: String },
     Item { id_name: String },
 }
 
-pub async fn get_item_identifiers() -> Result<Vec<ItemIdentifier>, anyhow::Error> {
+pub async fn get_item_identifiers() -> Result<Vec<ItemIdentifier>, ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(untagged)]
     enum Message {
