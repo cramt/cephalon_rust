@@ -9,7 +9,6 @@ authors = ["cramt"]
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.81"
-config = "0.14"
 ctreg = "1.0.2"
 dirs = "5.0.1"
 futures = "0.3"
