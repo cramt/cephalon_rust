@@ -113,7 +113,7 @@ pub async fn watcher() -> tokio::sync::mpsc::Receiver<LogEntry> {
                 if let Ok(entry) = str.parse() {
                     tx.send(entry).await.unwrap();
                 } else {
-                    even!(Level::INFO, "failed to parse log entry: {str}");
+                    event!(Level::INFO, "failed to parse log entry: {str:?}");
                 }
             }
             sleep(Duration::from_millis(100)).await;
