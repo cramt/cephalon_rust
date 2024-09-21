@@ -16,6 +16,33 @@ pub async fn parse_relic_screen<'a>(
     tesseract_path: &Path,
     items: &HashMap<String, Item>,
 ) -> Vec<Option<Item>> {
+    fn match_item(items: &HashMap<String, Item>, name: &str) -> Option<Item> {
+        let mut items = items
+            .iter()
+            .filter(|(_, v)| name.contains(&v.name))
+            .map(|(_, v)| v)
+            .take(2);
+        let first = items.next();
+        let second = items.next();
+        let item = match (first, second) {
+            (Some(item), None) => Some(item),
+            _ => None,
+        };
+        item.cloned()
+    }
+    fn clean_ocr_output(buffer: &str) -> String {
+        let finder = CapitalFinder::new();
+        let mut buffer = buffer
+            .replace("Primie", "Prime")
+            .replace("Bursten", "Burston")
+            .replace("PTifie", "Prime")
+            .replace("Recelver", "Receiver"); //TODO: bad solution, get
+                                              //tesseract to act better
+        while let Some(res) = finder.captures(buffer.as_str()) {
+            buffer.insert(res.capital.start, ' ')
+        }
+        buffer
+    }
     let width = img.width();
     let height = img.height();
     let middle = width / 2;
@@ -45,47 +72,52 @@ pub async fn parse_relic_screen<'a>(
         .map(|p| {
             let mut img = img.clone();
             async move {
-                let mut buffer = String::new();
-                for i in 1.. {
-                    let new = img.crop(
-                        p,
-                        frame_bottom - (text_height * i),
-                        frame_width,
-                        text_height,
-                    );
-                    create_dir_all("debug_img_out").await.unwrap();
-                    new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
-                    let result = ocr::ocr(new, tesseract_path).await.ok()?;
-                    let res = result.trim();
-                    if res.is_empty() {
-                        break;
-                    } else {
-                        buffer = format!("{res}{buffer}");
+                // naive cropping
+                {
+                    for i in (2..=3).rev() {
+                        let new = img.crop(
+                            p,
+                            frame_bottom - (text_height * i),
+                            frame_width,
+                            text_height * i,
+                        );
+                        create_dir_all("debug_img_out").await.unwrap();
+                        new.save(format!("debug_img_out/{p}_{i}_naive.png"))
+                            .unwrap();
+                        let result = ocr::ocr(new, tesseract_path).await.ok()?;
+                        let res = result.trim().replace("\n", "");
+                        let buffer = clean_ocr_output(&res);
+                        if let Some(result) = match_item(items, &buffer) {
+                            return Some(result);
+                        }
                     }
                 }
-                let finder = CapitalFinder::new();
-                let mut buffer = buffer
-                    .replace("Primie", "Prime")
-                    .replace("Bursten", "Burston")
-                    .replace("Recelver", "Receiver"); //TODO: bad solution, get
-                                                      //tesseract to act better
-                while let Some(res) = finder.captures(buffer.as_str()) {
-                    buffer.insert(res.capital.start, ' ')
+                // pessimistic cropping
+                {
+                    let mut buffer = String::new();
+                    for i in 1.. {
+                        let new = img.crop(
+                            p,
+                            frame_bottom - (text_height * i),
+                            frame_width,
+                            text_height,
+                        );
+                        create_dir_all("debug_img_out").await.unwrap();
+                        new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
+                        let result = ocr::ocr(new, tesseract_path).await.ok()?;
+                        let res = result.trim();
+                        if res.is_empty() {
+                            break;
+                        } else {
+                            buffer = format!("{res}{buffer}");
+                        }
+                    }
+                    let buffer = clean_ocr_output(&buffer);
+                    if let Some(result) = match_item(items, &buffer) {
+                        return Some(result);
+                    }
                 }
-
-                let mut items = items
-                    .iter()
-                    .filter(|(_, v)| buffer.contains(&v.name))
-                    .map(|(_, v)| v)
-                    .take(2);
-                let first = items.next();
-                let second = items.next();
-                let item = match (first, second) {
-                    (Some(item), None) => Some(item),
-                    _ => None,
-                };
-                //println!("{buffer:?} = {item:?}");
-                item.cloned()
+                None
             }
         })
         .collect::<FuturesOrdered<_>>()
@@ -169,6 +201,78 @@ mod tests {
                 Some("Oberon Prime Blueprint".to_string()),
                 Some("Sybaris Prime Blueprint".to_string()),
                 Some("Lex Prime Receiver".to_string()),
+            ],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn _3() {
+        let img = ImageReader::open("test_rewards_screens/3.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        assert(
+            &img,
+            vec![
+                Some("Grendel Prime Neuroptics Blueprint".to_string()),
+                Some("Burston Prime Receiver".to_string()),
+                None,
+                None,
+            ],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn _4() {
+        let img = ImageReader::open("test_rewards_screens/4.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        assert(
+            &img,
+            vec![
+                Some("Larkspur Prime Blueprint".to_string()),
+                None,
+                Some("Paris Prime Blueprint".to_string()),
+                Some("Braton Prime Blueprint".to_string()),
+            ],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn _5() {
+        let img = ImageReader::open("test_rewards_screens/5.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        assert(
+            &img,
+            vec![
+                Some("Baruuk Prime Systems Blueprint".to_string()),
+                None,
+                Some("Shade Prime Blueprint".to_string()),
+                None,
+            ],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn _6() {
+        let img = ImageReader::open("test_rewards_screens/6.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        assert(
+            &img,
+            vec![
+                Some("Lex Prime Receiver".to_string()),
+                Some("Khora Prime Systems Blueprint".to_string()),
+                Some("Equinox Prime Chassis Blueprint".to_string()),
+                Some("Braton Prime Blueprint".to_string()),
             ],
         )
         .await;

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{config::client, items::Payload};
@@ -39,9 +39,9 @@ pub enum UserStatus {
 pub struct User {
     pub reputation: u32,
     pub locale: String,
-    pub avatar: String,
+    pub avatar: Option<String>,
     pub ingame_name: String,
-    pub last_seen: NaiveDateTime,
+    pub last_seen: DateTime<Utc>,
     pub id: String,
     pub region: String,
     pub status: UserStatus,
@@ -52,10 +52,10 @@ pub struct Order {
     pub quantity: u32,
     pub platinum: u32,
     pub order_type: OrderType,
-    pub visibile: bool,
+    pub visible: bool,
     pub platform: Platform,
-    pub creation_date: NaiveDateTime,
-    pub last_update: NaiveDateTime,
+    pub creation_date: DateTime<Utc>,
+    pub last_update: DateTime<Utc>,
     pub id: String,
     pub region: String,
     pub user: User,
@@ -78,4 +78,15 @@ pub async fn fetch_orders(id_name: &str) -> Result<Vec<Order>, ReqwestSerdeError
         .await?
         .payload
         .orders)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::items::orders::fetch_orders;
+
+    #[tokio::test]
+    async fn it_works() {
+        let result = fetch_orders("saryn_prime_systems_blueprint").await;
+        assert!(result.is_ok(), "{result:?}");
+    }
 }

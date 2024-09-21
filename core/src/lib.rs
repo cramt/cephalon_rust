@@ -1,5 +1,6 @@
 #![allow(clippy::single_match)]
 
+use futures::{stream::FuturesUnordered, StreamExt};
 use image::DynamicImage;
 use items::{
     cached_get_item_identifiers, cached_items_and_sets, items::Item, CacheError, ReqwestSerdeError,
@@ -9,14 +10,7 @@ use relic_screen_parser::parse_relic_screen;
 use state::State;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 use thiserror::Error;
-use tokio::{
-    fs::create_dir_all,
-    sync::{
-        mpsc::Sender,
-        oneshot::{self},
-    },
-    time::sleep,
-};
+use tokio::{fs::create_dir_all, sync::mpsc::Sender, time::sleep};
 use xcap::{Window, XCapError};
 
 pub mod config;
@@ -109,8 +103,13 @@ impl Engine {
                             .send(State {
                                 relic_rewards: results
                                     .into_iter()
-                                    .map(|x| x.map(|y| (y.clone(), 1)))
-                                    .collect(),
+                                    .map(|x| async move {
+                                        let x = x?;
+                                        Some((x.clone(), x.price().await.ok()?))
+                                    })
+                                    .collect::<FuturesUnordered<_>>()
+                                    .collect::<Vec<_>>()
+                                    .await,
                             })
                             .await;
 
