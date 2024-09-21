@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 pub async fn validate_path(path: &Path) -> bool {
     Command::new(path)
+        .arg("--version")
         .stdout(Stdio::null())
         .stdin(Stdio::null())
         .stderr(Stdio::null())

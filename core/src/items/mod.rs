@@ -1,5 +1,6 @@
 pub mod item_identifiers;
 pub mod items;
+pub mod orders;
 pub mod relics;
 
 use std::{
@@ -71,7 +72,6 @@ async fn cache_in_file<
     path: P,
     create: F,
 ) -> Result<T, CacheError<E>> {
-    println!("{:?}", std::path::absolute(path.as_ref()));
     //TODO: make the file IO async in this file
     fn cache_read<P: AsRef<Path>, T: DeserializeOwned + Serialize>(path: P) -> Option<T> {
         let file = File::open(path).ok()?;
@@ -86,6 +86,7 @@ async fn cache_in_file<
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(path)
                 .map_err(|x| CacheError::CreateFileError(x))?;
             let writer = BufWriter::new(file);

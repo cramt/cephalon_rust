@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::items::orders::{Order, OrderType, Platform};
 use crate::items::ItemIdentifier;
 use crate::{
     config::client,
@@ -8,6 +9,7 @@ use crate::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 
+use super::orders::{fetch_orders, UserStatus};
 use super::ReqwestSerdeError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,8 +31,41 @@ pub struct Item {
     pub quantity_for_set: u32,
 }
 
+impl Item {
+    pub async fn price(&self) -> Result<u32, ReqwestSerdeError> {
+        fn not_offlines(order: &&Order) -> bool {
+            order.user.status != UserStatus::Offline
+        }
+        fn any(_: &&Order) -> bool {
+            true
+        }
+        let orders = fetch_orders(&self.id_name)
+            .await?
+            .into_iter()
+            .filter(|x| {
+                x.platform == Platform::Pc && x.region == "en" && x.order_type == OrderType::Buy
+            })
+            .collect::<Vec<_>>();
+        let filter = if orders.iter().filter(not_offlines).count() > 3 {
+            not_offlines
+        } else {
+            any
+        };
+        let mut orders = orders
+            .iter()
+            .filter(filter)
+            .map(|x| x.platinum)
+            .collect::<Vec<_>>();
+        orders.sort();
+        if orders.is_empty() {
+            return Ok(0);
+        }
+        Ok(orders[orders.len() / 2])
+    }
+}
+
 pub async fn fetch_items_and_sets(
-    identifiers: &Vec<ItemIdentifier>,
+    identifiers: &[ItemIdentifier],
 ) -> Result<(HashMap<String, Item>, HashMap<String, ItemSet>), ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
     pub struct MessageInner2 {

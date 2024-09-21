@@ -18,9 +18,7 @@ pub struct Relic {
     pub trading_tax: u32,
 }
 
-pub async fn fetch_relics(
-    identifiers: &Vec<ItemIdentifier>,
-) -> Result<Vec<Relic>, ReqwestSerdeError> {
+pub async fn fetch_relics(identifiers: &[ItemIdentifier]) -> Result<Vec<Relic>, ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
     pub struct MessageInner2 {
         item_name: String,

@@ -30,7 +30,7 @@ static DEFAULT_PATH: [&str; 3] = ["AppData", "Local", "Warframe"];
 pub fn get_default_path() -> PathBuf {
     dirs::home_dir()
         .unwrap()
-        .into_iter()
+        .iter()
         .chain(DEFAULT_PATH.iter().map(OsStr::new))
         .collect()
 }
@@ -112,7 +112,7 @@ pub async fn watcher() -> tokio::sync::mpsc::Receiver<LogEntry> {
                 if let Ok(entry) = str.parse() {
                     tx.send(entry).await.unwrap();
                 } else {
-                    println!("failed to parse log entry: {str}");
+                    //println!("failed to parse log entry: {str}");
                 }
             }
             sleep(Duration::from_millis(100)).await;

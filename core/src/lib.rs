@@ -13,7 +13,7 @@ use tokio::{
     fs::create_dir_all,
     sync::{
         mpsc::Sender,
-        oneshot::{self, error::TryRecvError},
+        oneshot::{self},
     },
     time::sleep,
 };
@@ -88,19 +88,19 @@ impl Engine {
         let mut reciever = watcher().await;
 
         let relic_screen_enabler = {
-            let (tx, mut rx) = tokio::sync::mpsc::channel::<oneshot::Receiver<()>>(100);
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(100);
 
             let tesseract_path = self.tesseract_path.clone();
             let debug = self.debug;
 
             tokio::spawn(async move {
-                while let Some(mut stopper) = rx.recv().await {
-                    while matches!(stopper.try_recv(), Err(TryRecvError::Empty)) {
-                        sleep(Duration::from_millis(300)).await;
+                while (rx.recv().await).is_some() {
+                    for i in 0..10 {
+                        sleep(Duration::from_millis(1000)).await;
                         let image = warframe.capture_image().unwrap();
                         let image = DynamicImage::ImageRgba8(image);
                         if debug {
-                            image.save("reward_capture.png").unwrap();
+                            image.save(format!("reward_capture{i}.png")).unwrap();
                         }
                         let results =
                             parse_relic_screen(&image, 4, &tesseract_path, &self.items).await;
@@ -124,23 +124,13 @@ impl Engine {
             tx
         };
 
-        let mut relic_screen_disabler = None;
-
         while let Some(entry) = reciever.recv().await {
             match entry {
                 LogEntry::ScriptInfo { script, content } => match script.as_str() {
                     "ProjectionRewardChoice" => match content.as_str() {
                         "Relic rewards initialized" => {
-                            let (oneshot_tx, oneshot_rx) = oneshot::channel::<()>();
-                            let _ = relic_screen_enabler.send(oneshot_rx).await;
-                            relic_screen_disabler = Some(oneshot_tx);
-                        }
-                        "Got rewards" => {
-                            if let Some(disabler) = relic_screen_disabler {
-                                let _ = disabler.send(());
-                                relic_screen_disabler = None;
-                            }
-                            println!("Finished reward screen")
+                            let _ = relic_screen_enabler.send(()).await;
+                            println!("Got reward screen")
                         }
                         _ => {}
                     },

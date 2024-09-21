@@ -4,6 +4,7 @@ use std::path::Path;
 use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
 use image::DynamicImage;
+use tokio::fs::create_dir_all;
 
 regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
@@ -52,6 +53,7 @@ pub async fn parse_relic_screen<'a>(
                         frame_width,
                         text_height,
                     );
+                    create_dir_all("debug_img_out").await.unwrap();
                     new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
                     let result = ocr::ocr(new, tesseract_path).await.ok()?;
                     let res = result.trim();
@@ -82,7 +84,7 @@ pub async fn parse_relic_screen<'a>(
                     (Some(item), None) => Some(item),
                     _ => None,
                 };
-                println!("{buffer:?} = {item:?}");
+                //println!("{buffer:?} = {item:?}");
                 item.cloned()
             }
         })
