@@ -11,6 +11,7 @@ use state::State;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 use thiserror::Error;
 use tokio::{fs::create_dir_all, sync::mpsc::Sender, time::sleep};
+use tracing::*;
 use xcap::{Window, XCapError};
 
 pub mod config;
@@ -23,7 +24,6 @@ pub mod state;
 pub struct Engine {
     tesseract_path: PathBuf,
     items: HashMap<String, Item>,
-    debug: bool,
 }
 
 #[derive(Error, Debug)]
@@ -48,7 +48,6 @@ impl Engine {
     pub async fn new(
         tesseract_path: PathBuf,
         cache_path: PathBuf,
-        debug: bool,
     ) -> Result<Self, EngineCreateError> {
         let (valid_path, cache_path_status) = tokio::join!(
             ocr::validate_path(&tesseract_path),
@@ -63,7 +62,6 @@ impl Engine {
         Ok(Self {
             tesseract_path,
             items,
-            debug,
         })
     }
 
@@ -73,10 +71,10 @@ impl Engine {
             .into_iter()
             .find(|x| x.title() == "Warframe")
             .ok_or(EngineRunError::WarframeNotRunning)?;
-        if self.debug {
+        {
             let image = warframe.capture_image().unwrap();
             let image = DynamicImage::ImageRgba8(image);
-            image.save("initial_test.png").unwrap();
+            debug_write_image(&image, "initial");
         }
 
         let mut reciever = watcher().await;
@@ -85,17 +83,16 @@ impl Engine {
             let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(100);
 
             let tesseract_path = self.tesseract_path.clone();
-            let debug = self.debug;
 
             tokio::spawn(async move {
                 while (rx.recv().await).is_some() {
+                    event!(Level::INFO, "relic screen parser activated");
                     for i in 0..10 {
+                        event!(Level::INFO, "relic screen run {i}");
                         sleep(Duration::from_millis(1000)).await;
                         let image = warframe.capture_image().unwrap();
                         let image = DynamicImage::ImageRgba8(image);
-                        if debug {
-                            image.save(format!("reward_capture{i}.png")).unwrap();
-                        }
+                        debug_write_image(&image, &format!("reward_capture_{i}"));
                         let results =
                             parse_relic_screen(&image, 4, &tesseract_path, &self.items).await;
                         let finished = results.iter().filter(|x| x.is_some()).count() == 4;
@@ -114,6 +111,7 @@ impl Engine {
                             .await;
 
                         if finished {
+                            event!(Level::INFO, "relic screen run found all, finishing early");
                             break;
                         }
                     }
@@ -128,8 +126,8 @@ impl Engine {
                 LogEntry::ScriptInfo { script, content } => match script.as_str() {
                     "ProjectionRewardChoice" => match content.as_str() {
                         "Relic rewards initialized" => {
+                            event!(Level::INFO, "Running relic screen parser");
                             let _ = relic_screen_enabler.send(()).await;
-                            println!("Got reward screen")
                         }
                         _ => {}
                     },
@@ -142,3 +140,12 @@ impl Engine {
         Ok(())
     }
 }
+
+#[cfg(debug_assertions)]
+pub(crate) fn debug_write_image(img: &DynamicImage, name: &str) {
+    std::fs::create_dir_all("debug_img_out").unwrap();
+    img.save(format!("debug_img_out/{name}.png")).unwrap();
+}
+
+#[cfg(not(debug_assertions))]
+pub(crate) fn debug_write_image(img: &DynamicImage, name: &str) {}

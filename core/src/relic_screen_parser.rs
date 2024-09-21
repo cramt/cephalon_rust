@@ -4,11 +4,11 @@ use std::path::Path;
 use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
 use image::DynamicImage;
-use tokio::fs::create_dir_all;
+use tracing::*;
 
 regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
-use crate::{items::items::Item, ocr};
+use crate::{debug_write_image, items::items::Item, ocr};
 
 pub async fn parse_relic_screen<'a>(
     img: &DynamicImage,
@@ -16,6 +16,7 @@ pub async fn parse_relic_screen<'a>(
     tesseract_path: &Path,
     items: &HashMap<String, Item>,
 ) -> Vec<Option<Item>> {
+    #[instrument]
     fn match_item(items: &HashMap<String, Item>, name: &str) -> Option<Item> {
         let mut items = items
             .iter()
@@ -30,6 +31,7 @@ pub async fn parse_relic_screen<'a>(
         };
         item.cloned()
     }
+    #[instrument]
     fn clean_ocr_output(buffer: &str) -> String {
         let finder = CapitalFinder::new();
         let mut buffer = buffer
@@ -75,19 +77,19 @@ pub async fn parse_relic_screen<'a>(
                 // naive cropping
                 {
                     for i in (2..=3).rev() {
+                        event!(Level::INFO, "trying naive cropping: {i} lines");
                         let new = img.crop(
                             p,
                             frame_bottom - (text_height * i),
                             frame_width,
                             text_height * i,
                         );
-                        create_dir_all("debug_img_out").await.unwrap();
-                        new.save(format!("debug_img_out/{p}_{i}_naive.png"))
-                            .unwrap();
+                        debug_write_image(&new, &format!("naive_crop_{p}_{i}"));
                         let result = ocr::ocr(new, tesseract_path).await.ok()?;
                         let res = result.trim().replace("\n", "");
                         let buffer = clean_ocr_output(&res);
                         if let Some(result) = match_item(items, &buffer) {
+                            event!(Level::INFO, "match: {result:?}");
                             return Some(result);
                         }
                     }
@@ -96,14 +98,14 @@ pub async fn parse_relic_screen<'a>(
                 {
                     let mut buffer = String::new();
                     for i in 1.. {
+                        event!(Level::INFO, "trying pessimistic cropping: {i} lines");
                         let new = img.crop(
                             p,
                             frame_bottom - (text_height * i),
                             frame_width,
                             text_height,
                         );
-                        create_dir_all("debug_img_out").await.unwrap();
-                        new.save(format!("debug_img_out/{p}_{i}.png")).unwrap();
+                        debug_write_image(&new, &format!("pessimistic_crop_{p}_{i}"));
                         let result = ocr::ocr(new, tesseract_path).await.ok()?;
                         let res = result.trim();
                         if res.is_empty() {
@@ -114,6 +116,7 @@ pub async fn parse_relic_screen<'a>(
                     }
                     let buffer = clean_ocr_output(&buffer);
                     if let Some(result) = match_item(items, &buffer) {
+                        event!(Level::INFO, "match: {result:?}");
                         return Some(result);
                     }
                 }

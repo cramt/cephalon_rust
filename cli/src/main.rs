@@ -1,17 +1,24 @@
 pub mod config;
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fs::OpenOptions, path::Path};
 
 use cephalon_rust_core::{state::State, Engine};
 use config::settings;
+use tracing_subscriber::{fmt, prelude::*, Registry};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let log_file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("cephalon.log")
+        .unwrap();
+    let subscriber = Registry::default().with(fmt::layer().with_writer(log_file));
+    tracing::subscriber::set_global_default(subscriber).unwrap();
     let setting = settings().await;
     let engine = Engine::new(
         Path::new(&setting.tesseract_path).to_path_buf(),
         Path::new(&setting.cache_path).to_path_buf(),
-        true,
     )
     .await?;
     println!("engine inited");
