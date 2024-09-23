@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use ctreg::regex;
@@ -12,7 +12,7 @@ use crate::{debug_write_image, items::items::Item, ocr};
 
 pub async fn parse_relic_screen<'a>(
     img: &DynamicImage,
-    amount: u8,
+    amount: &HashSet<usize>,
     tesseract_path: &Path,
     items: &HashMap<String, Item>,
 ) -> Vec<Option<Item>> {
@@ -51,29 +51,30 @@ pub async fn parse_relic_screen<'a>(
     let frame_width = (width * 243) / 1920;
     let frame_bottom = (height * 460) / 1080;
     let text_height = (height * 24) / 1080;
-    let start_points = match amount {
-        4 => [
-            Some(middle - frame_width * 2),
-            Some(middle - frame_width),
-            Some(middle),
-            Some(middle + frame_width),
+    let start_points = match amount.len() {
+        4 => vec![
+            (middle - frame_width * 2),
+            (middle - frame_width),
+            (middle),
+            (middle + frame_width),
         ],
-        2 => [None, None, Some(middle - frame_width), Some(middle)],
-        3 => [
-            None,
-            Some(middle - ((3 * frame_width) / 2)),
-            Some(middle + (frame_width / 2)),
-            Some(middle - (frame_width / 2)),
+        2 => vec![(middle - frame_width), (middle)],
+        3 => vec![
+            middle - ((3 * frame_width) / 2),
+            middle + (frame_width / 2),
+            middle - (frame_width / 2),
         ],
-        1 => [None, None, None, Some(middle - (frame_width / 2))],
-        _ => [None, None, None, None],
+        1 => vec![(middle - (frame_width / 2))],
+        _ => Vec::new(),
     };
     start_points
         .into_iter()
-        .flatten()
+        .enumerate()
+        .map(|(i, x)| if amount.contains(&i) { Some(x) } else { None })
         .map(|p| {
             let mut img = img.clone();
             async move {
+                let p = p?;
                 // naive cropping
                 {
                     for i in (2..=3).rev() {
@@ -147,7 +148,7 @@ mod tests {
         let (items, _) = cached_items_and_sets(cache_path, &item_identifiers)
             .await
             .unwrap();
-        let result = parse_relic_screen(img, 4, tes, &items)
+        let result = parse_relic_screen(img, &(0..4).collect(), tes, &items)
             .await
             .into_iter()
             .map(|x| x.map(|y| y.name.to_string()))

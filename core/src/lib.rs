@@ -80,28 +80,49 @@ impl Engine {
         let mut reciever = watcher().await;
 
         let relic_screen_enabler = {
-            let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(100);
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<usize>(100);
 
             let tesseract_path = self.tesseract_path.clone();
 
             tokio::spawn(async move {
-                while (rx.recv().await).is_some() {
+                while let Some(amount) = rx.recv().await {
                     event!(Level::INFO, "relic screen parser activated");
+                    let mut total_results =
+                        (0..amount).map(|_| None).collect::<Vec<Option<Item>>>();
                     for i in 0..10 {
                         event!(Level::INFO, "relic screen run {i}");
                         sleep(Duration::from_millis(1000)).await;
                         let image = warframe.capture_image().unwrap();
                         let image = DynamicImage::ImageRgba8(image);
                         debug_write_image(&image, &format!("reward_capture_{i}"));
-                        let results =
-                            parse_relic_screen(&image, 4, &tesseract_path, &self.items).await;
-                        let finished = results.iter().filter(|x| x.is_some()).count() == 4;
+                        let results = parse_relic_screen(
+                            &image,
+                            &total_results
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, x)| x.is_some())
+                                .map(|(i, _)| i)
+                                .collect(),
+                            &tesseract_path,
+                            &self.items,
+                        )
+                        .await;
+                        total_results = total_results
+                            .into_iter()
+                            .zip(results.into_iter())
+                            .map(|(a, b)| match (a, b) {
+                                (Some(x), _) => Some(x),
+                                (_, Some(x)) => Some(x),
+                                _ => None,
+                            })
+                            .collect();
+                        let finished = total_results.iter().filter(|x| x.is_some()).count() == 4;
                         let _ = sender
                             .send(State {
-                                relic_rewards: results
-                                    .into_iter()
+                                relic_rewards: total_results
+                                    .iter()
                                     .map(|x| async move {
-                                        let x = x?;
+                                        let x = x.as_ref()?;
                                         Some((x.clone(), x.price().await.ok()?))
                                     })
                                     .collect::<FuturesUnordered<_>>()
@@ -127,7 +148,8 @@ impl Engine {
                     "ProjectionRewardChoice" => match content.as_str() {
                         "Relic rewards initialized" => {
                             event!(Level::INFO, "Running relic screen parser");
-                            let _ = relic_screen_enabler.send(()).await;
+                            let _ = relic_screen_enabler.send(4).await; //eventually replace this
+                                                                        //hardedcoded 4
                         }
                         _ => {}
                     },
