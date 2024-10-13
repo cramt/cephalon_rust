@@ -77,6 +77,8 @@ impl Engine {
             debug_write_image(&image, "initial");
         }
 
+        let mut squad_size = 1;
+
         let mut reciever = watcher().await;
 
         let relic_screen_enabler = {
@@ -116,7 +118,8 @@ impl Engine {
                                 _ => None,
                             })
                             .collect();
-                        let finished = total_results.iter().filter(|x| x.is_some()).count() == 4;
+                        let finished =
+                            total_results.iter().filter(|x| x.is_some()).count() == amount;
                         let _ = sender
                             .send(State {
                                 relic_rewards: total_results
@@ -148,13 +151,16 @@ impl Engine {
                     "ProjectionRewardChoice" => match content.as_str() {
                         "Relic rewards initialized" => {
                             event!(Level::INFO, "Running relic screen parser");
-                            let _ = relic_screen_enabler.send(4).await; //eventually replace this
-                                                                        //hardedcoded 4
+                            let _ = relic_screen_enabler.send(squad_size).await;
                         }
                         _ => {}
                     },
                     _ => {}
                 },
+                LogEntry::NetInfo(x) if x == "Num session players: 1" => squad_size = 1,
+                LogEntry::NetInfo(x) if x == "Num session players: 2" => squad_size = 2,
+                LogEntry::NetInfo(x) if x == "Num session players: 3" => squad_size = 3,
+                LogEntry::NetInfo(x) if x == "Num session players: 4" => squad_size = 4,
                 _ => {}
             }
         }
