@@ -1,5 +1,7 @@
-use std::{io::Cursor, path::Path, process::Stdio};
-use tokio::io::AsyncWriteExt;
+use ocrs::{ImageSource, OcrEngine, OcrEngineParams};
+use rten::Model;
+use std::{cell::OnceCell, io::Cursor, path::Path, process::Stdio, sync::OnceLock};
+use tokio::{io::AsyncWriteExt, task::spawn_blocking};
 
 use image::DynamicImage;
 use tokio::process::Command;
@@ -17,21 +19,31 @@ pub async fn validate_path(path: &Path) -> bool {
 }
 
 pub async fn ocr(img: DynamicImage, tesseract_path: &Path) -> anyhow::Result<String> {
-    let mut process = Command::new(tesseract_path)
-        .arg("stdin")
-        .arg("stdout")
-        .arg("-c")
-        .arg("tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        .stdout(Stdio::piped())
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    {
-        let mut stdin = process.stdin.take().unwrap();
-        let mut pnm = Vec::new();
-        img.write_to(&mut Cursor::new(&mut pnm), image::ImageFormat::Pnm)?;
-        stdin.write_all(pnm.as_ref()).await?;
-    }
-    let output = process.wait_with_output().await?;
-    Ok(String::from_utf8(output.stdout)?)
+    spawn_blocking(move || ocr_blocking(img)).await?
+}
+
+fn ocr_blocking(img: DynamicImage) -> anyhow::Result<String> {
+    static ENGINE: OnceLock<OcrEngine> = OnceLock::new();
+
+    let engine = ENGINE.get_or_init(|| {
+        OcrEngine::new(OcrEngineParams {
+            detection_model: Some(
+                Model::load_static_slice(include_bytes!("../../models/text-detection.rten"))
+                    .unwrap(),
+            ),
+            recognition_model: Some(
+                Model::load_static_slice(include_bytes!("../../models/text-recognition.rten"))
+                    .unwrap(),
+            ),
+            ..Default::default()
+        })
+        .unwrap()
+    });
+    let img = img.into_rgb8();
+    let source = ImageSource::from_bytes(img.as_raw(), img.dimensions())?;
+
+    let ocr_input = engine.prepare_input(source)?;
+    let result = engine.get_text(&ocr_input);
+    println!("{result:?}");
+    result
 }
