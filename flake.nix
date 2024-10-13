@@ -36,8 +36,6 @@
           ];
 
           buildInputs = with pkgs; [
-            tesseract
-
             openssl
             freetype
 
@@ -76,12 +74,10 @@
               pkg-config
               rust-analyzer
               rustfmt
-              tesseract
               cargo-dist
               cargo-edit
             ];
             shellHook = ''
-              export TESSERACT_PATH=${pkgs.tesseract}/bin/tesseract
               export $(cat config.env | xargs)
               export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
             '';

@@ -16,11 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = Registry::default().with(fmt::layer().with_writer(log_file));
     tracing::subscriber::set_global_default(subscriber).unwrap();
     let setting = settings().await;
-    let engine = Engine::new(
-        Path::new(&setting.tesseract_path).to_path_buf(),
-        Path::new(&setting.cache_path).to_path_buf(),
-    )
-    .await?;
+    let engine = Engine::new(Path::new(&setting.cache_path).to_path_buf()).await?;
     println!("engine inited");
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<State>(100);

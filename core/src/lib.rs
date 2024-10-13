@@ -22,7 +22,6 @@ pub mod relic_screen_parser;
 pub mod state;
 
 pub struct Engine {
-    tesseract_path: PathBuf,
     items: HashMap<String, Item>,
 }
 
@@ -30,8 +29,6 @@ pub struct Engine {
 pub enum EngineCreateError {
     #[error("create cache path error")]
     CreateCachePathError(#[from] std::io::Error),
-    #[error("invalid tesseract")]
-    InvalidTesseract,
     #[error("create cache path error")]
     FetchError(#[from] CacheError<ReqwestSerdeError>),
 }
@@ -45,24 +42,11 @@ pub enum EngineRunError {
 }
 
 impl Engine {
-    pub async fn new(
-        tesseract_path: PathBuf,
-        cache_path: PathBuf,
-    ) -> Result<Self, EngineCreateError> {
-        let (valid_path, cache_path_status) = tokio::join!(
-            ocr::validate_path(&tesseract_path),
-            create_dir_all(&cache_path)
-        );
-        cache_path_status?;
-        if !valid_path {
-            return Err(EngineCreateError::InvalidTesseract);
-        }
+    pub async fn new(cache_path: PathBuf) -> Result<Self, EngineCreateError> {
+        create_dir_all(&cache_path).await?;
         let item_identifiers = cached_get_item_identifiers(&cache_path).await?;
         let (items, _sets) = cached_items_and_sets(&cache_path, &item_identifiers).await?;
-        Ok(Self {
-            tesseract_path,
-            items,
-        })
+        Ok(Self { items })
     }
 
     pub async fn run(self, sender: Sender<State>) -> Result<(), EngineRunError> {
@@ -84,8 +68,6 @@ impl Engine {
         let relic_screen_enabler = {
             let (tx, mut rx) = tokio::sync::mpsc::channel::<usize>(100);
 
-            let tesseract_path = self.tesseract_path.clone();
-
             tokio::spawn(async move {
                 while let Some(amount) = rx.recv().await {
                     event!(Level::INFO, "relic screen parser activated");
@@ -105,7 +87,6 @@ impl Engine {
                                 .filter(|(_, x)| x.is_some())
                                 .map(|(i, _)| i)
                                 .collect(),
-                            &tesseract_path,
                             &self.items,
                         )
                         .await;

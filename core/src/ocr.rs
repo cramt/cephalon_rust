@@ -1,24 +1,11 @@
 use ocrs::{ImageSource, OcrEngine, OcrEngineParams};
 use rten::Model;
-use std::{cell::OnceCell, io::Cursor, path::Path, process::Stdio, sync::OnceLock};
-use tokio::{io::AsyncWriteExt, task::spawn_blocking};
+use std::sync::OnceLock;
+use tokio::task::spawn_blocking;
 
 use image::DynamicImage;
-use tokio::process::Command;
 
-pub async fn validate_path(path: &Path) -> bool {
-    Command::new(path)
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .map(|x| x.success())
-        .unwrap_or(false)
-}
-
-pub async fn ocr(img: DynamicImage, tesseract_path: &Path) -> anyhow::Result<String> {
+pub async fn ocr(img: DynamicImage) -> anyhow::Result<String> {
     spawn_blocking(move || ocr_blocking(img)).await?
 }
 

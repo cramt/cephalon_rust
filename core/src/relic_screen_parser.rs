@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 use ctreg::regex;
 use futures::stream::{FuturesOrdered, StreamExt};
@@ -13,7 +12,6 @@ use crate::{debug_write_image, items::items::Item, ocr};
 pub async fn parse_relic_screen<'a>(
     img: &DynamicImage,
     amount: &HashSet<usize>,
-    tesseract_path: &Path,
     items: &HashMap<String, Item>,
 ) -> Vec<Option<Item>> {
     #[instrument]
@@ -86,7 +84,7 @@ pub async fn parse_relic_screen<'a>(
                             text_height * i,
                         );
                         debug_write_image(&new, &format!("naive_crop_{p}_{i}"));
-                        let result = ocr::ocr(new, tesseract_path).await.ok()?;
+                        let result = ocr::ocr(new).await.ok()?;
                         let res = result.trim().replace("\n", "");
                         let buffer = clean_ocr_output(&res);
                         if let Some(result) = match_item(items, &buffer) {
@@ -107,7 +105,7 @@ pub async fn parse_relic_screen<'a>(
                             text_height,
                         );
                         debug_write_image(&new, &format!("pessimistic_crop_{p}_{i}"));
-                        let result = ocr::ocr(new, tesseract_path).await.ok()?;
+                        let result = ocr::ocr(new).await.ok()?;
                         let res = result.trim();
                         if res.is_empty() {
                             break;
@@ -131,7 +129,7 @@ pub async fn parse_relic_screen<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::{env, path::Path};
 
     use image::ImageReader;
 
@@ -142,13 +140,11 @@ mod tests {
     async fn assert(img: &DynamicImage, rhs: Vec<Option<String>>) {
         let cache_path = env::var("CACHE_PATH").unwrap();
         let cache_path = Path::new(&cache_path);
-        let tes = env::var("TESSERACT_PATH").unwrap();
-        let tes = Path::new(&tes);
         let item_identifiers = cached_get_item_identifiers(cache_path).await.unwrap();
         let (items, _) = cached_items_and_sets(cache_path, &item_identifiers)
             .await
             .unwrap();
-        let result = parse_relic_screen(img, &(0..4).collect(), tes, &items)
+        let result = parse_relic_screen(img, &(0..4).collect(), &items)
             .await
             .into_iter()
             .map(|x| x.map(|y| y.name.to_string()))
