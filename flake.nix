@@ -8,9 +8,12 @@
       url = "github:ipetkov/crane";
     };
 
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
     };
 
     flake-utils.url = "github:numtide/flake-utils";
@@ -21,12 +24,18 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, fenix, oranda, ... }:
+  outputs = { self, nixpkgs, crane, flake-utils, rust-overlay, oranda, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
 
-        craneLib = crane.mkLib pkgs;
+
+        rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         commonArgs = {
           strictDeps = true;
@@ -77,6 +86,7 @@
               cargo-dist
               cargo-edit
               cargo-nextest
+              cargo-llvm-cov
             ];
             shellHook = ''
               export $(cat config.env | xargs)
