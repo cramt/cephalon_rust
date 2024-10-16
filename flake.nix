@@ -22,9 +22,19 @@
       url = "github:axodotdev/oranda";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    detection_model = {
+      url = "https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten";
+      flake = false;
+    };
+
+    recognition_model = {
+      url = "https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, rust-overlay, oranda, ... }:
+  outputs = { self, nixpkgs, crane, flake-utils, rust-overlay, detection_model, recognition_model, oranda, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
@@ -61,6 +71,9 @@
             xorg.libxcb
             xorg.libX11
           ];
+
+          DETECTION_MODEL = detection_model;
+          RECOGNITION_MODEL = recognition_model;
         };
 
 

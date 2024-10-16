@@ -15,6 +15,18 @@
         "type": "github"
       }
     },
+    "detection_model": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-tsoNMVe42+EM86XEzKvFUyaS2nxvu7y3CPbV00wQDUE=",
+        "type": "file",
+        "url": "https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten"
+      }
+    },
     "fenix": {
       "inputs": {
         "nixpkgs": [
@@ -111,12 +123,26 @@
         "type": "github"
       }
     },
+    "recognition_model": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-AEQmSoTha15LTS8+GG/xdS6bkxM0tmf2iBAKqOOeEYk=",
+        "type": "file",
+        "url": "https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten"
+      }
+    },
     "root": {
       "inputs": {
         "crane": "crane",
+        "detection_model": "detection_model",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "oranda": "oranda",
+        "recognition_model": "recognition_model",
         "rust-overlay": "rust-overlay"
       }
     },

@@ -15,12 +15,10 @@ fn ocr_blocking(img: DynamicImage) -> anyhow::Result<String> {
     let engine = ENGINE.get_or_init(|| {
         OcrEngine::new(OcrEngineParams {
             detection_model: Some(
-                Model::load_static_slice(include_bytes!("../../models/text-detection.rten"))
-                    .unwrap(),
+                Model::load_static_slice(include_bytes!(env!("DETECTION_MODEL"))).unwrap(),
             ),
             recognition_model: Some(
-                Model::load_static_slice(include_bytes!("../../models/text-recognition.rten"))
-                    .unwrap(),
+                Model::load_static_slice(include_bytes!(env!("RECOGNITION_MODEL"))).unwrap(),
             ),
             ..Default::default()
         })
