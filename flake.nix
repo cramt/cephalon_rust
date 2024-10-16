@@ -76,6 +76,7 @@
               rustfmt
               cargo-dist
               cargo-edit
+              cargo-nextest
             ];
             shellHook = ''
               export $(cat config.env | xargs)

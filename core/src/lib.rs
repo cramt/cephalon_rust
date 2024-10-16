@@ -157,4 +157,4 @@ pub(crate) fn debug_write_image(img: &DynamicImage, name: &str) {
 }
 
 #[cfg(not(debug_assertions))]
-pub(crate) fn debug_write_image(img: &DynamicImage, name: &str) {}
+pub(crate) fn debug_write_image(_img: &DynamicImage, _name: &str) {}
