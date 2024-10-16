@@ -9,13 +9,26 @@ regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
 use crate::{debug_write_image, items::items::Item, ocr};
 
+#[derive(Debug)]
+pub enum ItemOrForma {
+    Item(Item),
+    Forma1X,
+    Forma2X,
+}
+
 pub async fn parse_relic_screen<'a>(
     img: &DynamicImage,
     amount: &HashSet<usize>,
     items: &HashMap<String, Item>,
-) -> Vec<Option<Item>> {
+) -> Vec<Option<ItemOrForma>> {
     #[instrument]
-    fn match_item(items: &HashMap<String, Item>, name: &str) -> Option<Item> {
+    fn match_item(items: &HashMap<String, Item>, name: &str) -> Option<ItemOrForma> {
+        if name.contains("2 X Forma Blueprint") {
+            return Some(ItemOrForma::Forma2X);
+        }
+        if name.contains("Forma Blueprint") {
+            return Some(ItemOrForma::Forma1X);
+        }
         let mut items = items
             .iter()
             .filter(|(_, v)| name.contains(&v.name))
@@ -27,7 +40,7 @@ pub async fn parse_relic_screen<'a>(
             (Some(item), None) => Some(item),
             _ => None,
         };
-        item.cloned()
+        item.cloned().map(ItemOrForma::Item)
     }
     #[instrument]
     fn clean_ocr_output(mut buffer: String) -> String {
@@ -141,7 +154,13 @@ mod tests {
         let result = parse_relic_screen(img, &(0..4).collect(), &items)
             .await
             .into_iter()
-            .map(|x| x.map(|y| y.name.to_string()))
+            .map(|x| {
+                x.map(|y| match y {
+                    ItemOrForma::Item(z) => z.name.to_string(),
+                    ItemOrForma::Forma1X => "Forma1X".to_string(),
+                    ItemOrForma::Forma2X => "Forma2X".to_string(),
+                })
+            })
             .collect::<Vec<_>>();
         assert_eq!(result, rhs);
     }
@@ -155,7 +174,7 @@ mod tests {
         assert(
             &img,
             vec![
-                None,
+                Some("Forma2X".to_string()),
                 Some("Okina Prime Handle".to_string()),
                 Some("Baruuk Prime Chassis Blueprint".to_string()),
                 Some("Shade Prime Systems".to_string()),
@@ -211,8 +230,8 @@ mod tests {
             vec![
                 Some("Grendel Prime Neuroptics Blueprint".to_string()),
                 Some("Burston Prime Receiver".to_string()),
-                None,
-                None,
+                Some("Forma1X".to_string()),
+                Some("Forma1X".to_string()),
             ],
         )
         .await;
@@ -228,7 +247,7 @@ mod tests {
             &img,
             vec![
                 Some("Larkspur Prime Blueprint".to_string()),
-                None,
+                Some("Forma1X".to_string()),
                 Some("Paris Prime Blueprint".to_string()),
                 Some("Braton Prime Blueprint".to_string()),
             ],
@@ -246,9 +265,9 @@ mod tests {
             &img,
             vec![
                 Some("Baruuk Prime Systems Blueprint".to_string()),
-                None,
+                Some("Forma1X".to_string()),
                 Some("Shade Prime Blueprint".to_string()),
-                None,
+                Some("Forma1X".to_string()),
             ],
         )
         .await;
