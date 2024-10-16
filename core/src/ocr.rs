@@ -29,6 +29,5 @@ fn ocr_blocking(img: DynamicImage) -> anyhow::Result<String> {
 
     let ocr_input = engine.prepare_input(source)?;
     let result = engine.get_text(&ocr_input);
-    println!("{result:?}");
     result
 }

@@ -30,14 +30,8 @@ pub async fn parse_relic_screen<'a>(
         item.cloned()
     }
     #[instrument]
-    fn clean_ocr_output(buffer: &str) -> String {
+    fn clean_ocr_output(mut buffer: String) -> String {
         let finder = CapitalFinder::new();
-        let mut buffer = buffer
-            .replace("Primie", "Prime")
-            .replace("Bursten", "Burston")
-            .replace("PTifie", "Prime")
-            .replace("Recelver", "Receiver"); //TODO: bad solution, get
-                                              //tesseract to act better
         while let Some(res) = finder.captures(buffer.as_str()) {
             buffer.insert(res.capital.start, ' ')
         }
@@ -85,8 +79,8 @@ pub async fn parse_relic_screen<'a>(
                         );
                         debug_write_image(&new, &format!("naive_crop_{p}_{i}"));
                         let result = ocr::ocr(new).await.ok()?;
-                        let res = result.trim().replace("\n", "");
-                        let buffer = clean_ocr_output(&res);
+                        let res = result.trim().replace("\n", " ");
+                        let buffer = clean_ocr_output(res);
                         if let Some(result) = match_item(items, &buffer) {
                             event!(Level::INFO, "match: {result:?}");
                             return Some(result);
@@ -113,7 +107,7 @@ pub async fn parse_relic_screen<'a>(
                             buffer = format!("{res}{buffer}");
                         }
                     }
-                    let buffer = clean_ocr_output(&buffer);
+                    let buffer = clean_ocr_output(buffer);
                     if let Some(result) = match_item(items, &buffer) {
                         event!(Level::INFO, "match: {result:?}");
                         return Some(result);
