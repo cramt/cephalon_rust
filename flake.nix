@@ -12,7 +12,6 @@
       url = "github:oxalica/rust-overlay";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
       };
     };
 
@@ -72,12 +71,16 @@
             xorg.libX11
           ];
 
+          # TODO: these 2 should only be during build, not sure if it is currently
           DETECTION_MODEL = detection_model;
           RECOGNITION_MODEL = recognition_model;
         };
 
 
+
+
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
 
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
