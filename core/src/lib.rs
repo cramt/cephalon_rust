@@ -61,7 +61,7 @@ impl Engine {
             debug_write_image(&image, "initial");
         }
 
-        let mut squad_size = 1;
+        let mut squad_size = 4;
 
         let mut reciever = watcher().await;
 
@@ -85,7 +85,7 @@ impl Engine {
                             &total_results
                                 .iter()
                                 .enumerate()
-                                .filter(|(_, x)| x.is_some())
+                                .filter(|(_, x)| x.is_none())
                                 .map(|(i, _)| i)
                                 .collect(),
                             &self.items,

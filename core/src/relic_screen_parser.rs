@@ -16,6 +16,7 @@ pub enum ItemOrForma {
     Forma2X,
 }
 
+#[instrument]
 pub async fn parse_relic_screen<'a>(
     img: &DynamicImage,
     amount: &HashSet<usize>,

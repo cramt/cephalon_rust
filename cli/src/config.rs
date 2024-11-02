@@ -4,7 +4,6 @@ use tokio::sync::OnceCell;
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
-    pub tesseract_path: String,
     pub cache_path: PathBuf,
 }
 
