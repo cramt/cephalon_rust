@@ -53,7 +53,7 @@ pub struct Order {
     pub platinum: u32,
     pub order_type: OrderType,
     pub visible: bool,
-    pub platform: Platform,
+    pub platform: Option<Platform>,
     pub creation_date: DateTime<Utc>,
     pub last_update: DateTime<Utc>,
     pub id: String,

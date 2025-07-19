@@ -43,7 +43,9 @@ impl Item {
             .await?
             .into_iter()
             .filter(|x| {
-                x.platform == Platform::Pc && x.region == "en" && x.order_type == OrderType::Buy
+                x.platform == Some(Platform::Pc)
+                    && x.region == "en"
+                    && x.order_type == OrderType::Buy
             })
             .collect::<Vec<_>>();
         let filter = if orders.iter().filter(not_offlines).count() > 3 {
