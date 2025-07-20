@@ -25,4 +25,4 @@ serde_json = "1.0"
 thiserror = "2.0.12"
 tokio = { version = "1", features = ["process", "macros", "rt-multi-thread", "sync", "fs"] }
 tracing = "0.1.40"
-xcap = "0.0.13"
+xcap = "0.6.2"

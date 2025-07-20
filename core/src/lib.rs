@@ -53,7 +53,7 @@ impl Engine {
         let windows = Window::all()?;
         let warframe = windows
             .into_iter()
-            .find(|x| x.title() == "Warframe")
+            .find(|x| x.title().unwrap_or_default() == "Warframe")
             .ok_or(EngineRunError::WarframeNotRunning)?;
         {
             let image = warframe.capture_image().unwrap();

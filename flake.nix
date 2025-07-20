@@ -17,11 +17,6 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    oranda = {
-      url = "github:axodotdev/oranda";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     detection_model = {
       url = "https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten";
       flake = false;
@@ -33,67 +28,62 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, rust-overlay, detection_model, recognition_model, oranda, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+  outputs = {
+    self,
+    nixpkgs,
+    crane,
+    flake-utils,
+    rust-overlay,
+    detection_model,
+    recognition_model,
+    ...
+  }:
+    flake-utils.lib.eachDefaultSystem (system: let
+      overlays = [(import rust-overlay)];
+      pkgs = import nixpkgs {
+        inherit system overlays;
+      };
 
+      rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
-        rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+      craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
-        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+      commonArgs = {
+        strictDeps = true;
 
-        commonArgs = {
-          strictDeps = true;
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+        ];
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
+        buildInputs = with pkgs; [
+          openssl
+          libGL
+          wayland
+          xorg.libxcb
+          libgbm
+          pipewire
+        ];
 
-          buildInputs = with pkgs; [
-            openssl
-            freetype
+        # TODO: these 2 should only be during build, not sure if it is currently
+        DETECTION_MODEL = detection_model;
+        RECOGNITION_MODEL = recognition_model;
+      };
 
-            libxkbcommon
-            libGL
+      cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-            # WINIT_UNIX_BACKEND=wayland
-            wayland
-
-            # WINIT_UNIX_BACKEND=x11
-            xorg.libXcursor
-            xorg.libXrandr
-            xorg.libXi
-            xorg.libxcb
-            xorg.libX11
-          ];
-
-          # TODO: these 2 should only be during build, not sure if it is currently
-          DETECTION_MODEL = detection_model;
-          RECOGNITION_MODEL = recognition_model;
-        };
-
-
-
-
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-
-        # Build the actual crate itself, reusing the dependency
-        # artifacts from above.
-        cephalon_rust = craneLib.buildPackage (commonArgs // {
+      # Build the actual crate itself, reusing the dependency
+      # artifacts from above.
+      cephalon_rust = craneLib.buildPackage (commonArgs
+        // {
           inherit cargoArtifacts;
         });
-      in
-      {
-        packages = {
-          default = cephalon_rust;
-        };
-        devShells = {
-          default = craneLib.devShell (commonArgs // {
+    in {
+      packages = {
+        default = cephalon_rust;
+      };
+      devShells = {
+        default = craneLib.devShell (commonArgs
+          // {
             packages = with pkgs; [
               bacon
               pkg-config
@@ -109,6 +99,6 @@
               export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath commonArgs.buildInputs}:$LD_LIBRARY_PATH
             '';
           });
-        };
-      });
+      };
+    });
 }
