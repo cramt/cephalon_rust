@@ -1,5 +1,7 @@
 # Relic Reward Overlay Implementation Plan
 
+> **STATUS: EXECUTED 2026-07-09** (merged to main, 83108a4). Tasks 1-7 complete + an inserted task 1b (warframe.market v1→v2 migration — v1 died upstream). Task 8's runtime verification steps (spike gate, synthetic e2e, fissure run) pending the user's live-game session. Kept for the historical record; the spec's "As-built deviations" section is the summary.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** In-game overlay that shows platinum prices under each relic reward card, built on Freya + winit (Orbolay's tech), fed by the existing core pipeline.

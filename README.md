@@ -26,6 +26,17 @@ non-primary display for the overlay. `RUST_LOG` overrides the log filter.
 labels are positioned relative to the warframe window, so borderless on half
 an ultrawide or a secondary monitor works too.
 
+## development
+
+`nix develop -c cargo nextest run` — tests hit the live warframe.market v2 api
+and cache into `CACHE_PATH`. to trigger the overlay without playing a mission
+(warframe just needs to be open):
+
+```sh
+echo '9999.999 Script [Info]: ProjectionRewardChoice.lua: Relic rewards initialized' \
+  >> ~/.local/share/Steam/steamapps/compatdata/230410/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.log
+```
+
 # TODO
 
 - generalize the determined price from all orders algorithm so the user of the

@@ -1,7 +1,7 @@
 # Relic Reward Overlay — Design
 
 **Date:** 2026-07-09
-**Status:** Approved
+**Status:** Implemented (merged to main 2026-07-09, commit 83108a4) — see "As-built deviations" at the bottom; runtime verification over the live game pending
 **Goal:** Revitalize cephalon_rust by giving the existing relic-reward pipeline an in-game overlay UI, built on the same tech as [Orbolay](https://github.com/SpikeHD/Orbolay) (Freya + winit, Skia rendering, transparent click-through window).
 
 ## Problem
@@ -84,3 +84,14 @@ Stays as the headless/debug frontend; updated to print the new `Event` stream.
 ## Milestones after MVP (recorded, not designed)
 
 Priority order per user: exclusive-fullscreen support → X11 host support → Windows support. Plus existing README TODOs (squad OCR, price-algorithm generalization).
+
+## As-built deviations (added post-implementation, 2026-07-09)
+
+The implementation matches this spec with four deviations, all recorded in the plan's amendments:
+
+1. **warframe.market v1 → v2 migration (forced, unplanned).** v1 was decommissioned upstream; the entire `core/src/items/` module now targets v2 (`data` envelope, `_v2`-suffixed cache files). Pricing intent preserved, except v2 has no per-order region — we filter by user locale instead (recorded as a TODO to reconsider).
+2. **Richer event shape.** `RewardsResolved(Vec<Option<(Item, u32)>>)` became `RewardsResolved(Vec<RewardSlot>)` with `RewardSlot { Pending | Forma | Item { item, price: Option<u32> } }` — the spec's shape couldn't distinguish forma from not-yet-OCR'd.
+3. **Game-window-relative positioning (user requirement, added mid-execution).** `RewardScreenOpened` carries the Warframe window's screen rect (`Option<WindowRect>`); the overlay computes card geometry from the game window's size and offsets labels by its position — so borderless on half an ultrawide or a secondary monitor works. The spec's "borderless = window covers the output" assumption is gone.
+4. **Monitor-capture fallback (scoped-in).** When no X11 "Warframe" window exists (native-Wayland via PROTON_ENABLE_WAYLAND), the engine captures the primary monitor with `window: None` instead of skipping — pulling part of the spec's deferred milestone 2 into the MVP.
+
+Also of note: the capture-library research (during execution) rejected crabgrab (archived, no Linux) and confirmed xcap's window path is pure X11 — the layer-shell fallback for COSMIC stacking remains documented-but-unused pending the runtime gate.
