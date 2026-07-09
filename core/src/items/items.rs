@@ -20,7 +20,7 @@ pub struct ItemSet {
     pub part_ids: HashSet<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Item {
     pub id: String,
     pub id_name: String,

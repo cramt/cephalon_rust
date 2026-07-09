@@ -1,13 +1,13 @@
 #![allow(clippy::single_match)]
 
-use futures::{stream::FuturesUnordered, StreamExt};
+use event::{Event, RewardSlot};
+use futures::{stream::FuturesOrdered, StreamExt};
 use image::DynamicImage;
 use items::{
     cached_get_item_identifiers, cached_items_and_sets, items::Item, CacheError, ReqwestSerdeError,
 };
 use log_watcher::{watcher, LogEntry};
 use relic_screen_parser::{parse_relic_screen, ItemOrForma};
-use state::State;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 use thiserror::Error;
 use tokio::{fs::create_dir_all, sync::mpsc::Sender, time::sleep};
@@ -18,9 +18,9 @@ pub mod config;
 pub mod geometry;
 pub mod items;
 pub mod log_watcher;
+pub mod event;
 pub mod ocr;
 pub mod relic_screen_parser;
-pub mod state;
 
 pub struct Engine {
     items: HashMap<String, Item>,
@@ -50,7 +50,7 @@ impl Engine {
         Ok(Self { items })
     }
 
-    pub async fn run(self, sender: Sender<State>) -> Result<(), EngineRunError> {
+    pub async fn run(self, sender: Sender<Event>) -> Result<(), EngineRunError> {
         let windows = Window::all()?;
         let warframe = windows
             .into_iter()
@@ -72,6 +72,7 @@ impl Engine {
             tokio::spawn(async move {
                 while let Some(amount) = rx.recv().await {
                     event!(Level::INFO, "relic screen parser activated");
+                    let _ = sender.send(Event::RewardScreenOpened { count: amount }).await;
                     let mut total_results = (0..amount)
                         .map(|_| None)
                         .collect::<Vec<Option<ItemOrForma>>>();
@@ -103,29 +104,31 @@ impl Engine {
                             .collect();
                         let finished =
                             total_results.iter().filter(|x| x.is_some()).count() == amount;
-                        let _ = sender
-                            .send(State {
-                                relic_rewards: total_results
-                                    .iter()
-                                    .map(|x| async move {
-                                        let x = match x.as_ref()? {
-                                            ItemOrForma::Item(x) => Some(x),
-                                            ItemOrForma::Forma1X => None,
-                                            ItemOrForma::Forma2X => None,
-                                        }?;
-                                        Some((x.clone(), x.price().await.ok()?))
-                                    })
-                                    .collect::<FuturesUnordered<_>>()
-                                    .collect::<Vec<_>>()
-                                    .await,
+                        let slots = total_results
+                            .iter()
+                            .map(|x| async move {
+                                match x {
+                                    None => RewardSlot::Pending,
+                                    Some(ItemOrForma::Forma1X) | Some(ItemOrForma::Forma2X) => {
+                                        RewardSlot::Forma
+                                    }
+                                    Some(ItemOrForma::Item(item)) => RewardSlot::Item {
+                                        item: item.clone(),
+                                        price: item.price().await.ok(),
+                                    },
+                                }
                             })
+                            .collect::<FuturesOrdered<_>>()
+                            .collect::<Vec<_>>()
                             .await;
+                        let _ = sender.send(Event::RewardsResolved(slots)).await;
 
                         if finished {
                             event!(Level::INFO, "relic screen run found all, finishing early");
                             break;
                         }
                     }
+                    let _ = sender.send(Event::RewardScreenClosed).await;
                 }
             });
 

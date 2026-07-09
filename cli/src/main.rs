@@ -1,8 +1,11 @@
 pub mod config;
 
-use std::{collections::HashMap, fs::OpenOptions, path::Path};
+use std::{fs::OpenOptions, path::Path};
 
-use cephalon_rust_core::{state::State, Engine};
+use cephalon_rust_core::{
+    event::{Event, RewardSlot},
+    Engine,
+};
 use config::settings;
 use tracing_subscriber::{fmt, prelude::*, Registry};
 
@@ -19,17 +22,32 @@ async fn main() -> anyhow::Result<()> {
     let engine = Engine::new(Path::new(&setting.cache_path).to_path_buf()).await?;
     println!("engine inited");
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<State>(100);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Event>(100);
 
     tokio::spawn(async move {
-        while let Some(state) = rx.recv().await {
-            let a = state
-                .relic_rewards
-                .into_iter()
-                .flatten()
-                .map(|(i, v)| (i.name, v))
-                .collect::<HashMap<_, _>>();
-            println!("{a:?}");
+        while let Some(event) = rx.recv().await {
+            match event {
+                Event::RewardScreenOpened { count } => {
+                    println!("reward screen opened ({count} cards)")
+                }
+                Event::RewardsResolved(slots) => {
+                    let summary = slots
+                        .iter()
+                        .map(|s| match s {
+                            RewardSlot::Pending => "…".to_string(),
+                            RewardSlot::Forma => "forma".to_string(),
+                            RewardSlot::Item {
+                                item,
+                                price: Some(p),
+                            } => format!("{} {p}p", item.name),
+                            RewardSlot::Item { item, price: None } => format!("{} ?p", item.name),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" | ");
+                    println!("{summary}");
+                }
+                Event::RewardScreenClosed => println!("reward screen closed"),
+            }
         }
     });
     engine.run(tx).await?;
