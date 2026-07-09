@@ -7,7 +7,7 @@ use cephalon_rust_core::{
     Engine,
 };
 use config::settings;
-use tracing_subscriber::{fmt, prelude::*, Registry};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -16,7 +16,12 @@ async fn main() -> anyhow::Result<()> {
         .create(true)
         .open("cephalon.log")
         .unwrap();
-    let subscriber = Registry::default().with(fmt::layer().with_writer(log_file));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("warn,cephalon_rust_core=info,cephalon_rust_cli=info")
+    });
+    let subscriber = Registry::default()
+        .with(filter)
+        .with(fmt::layer().with_writer(log_file));
     tracing::subscriber::set_global_default(subscriber).unwrap();
     let setting = settings().await;
     let engine = Engine::new(Path::new(&setting.cache_path).to_path_buf()).await?;

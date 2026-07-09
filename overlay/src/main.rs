@@ -9,7 +9,7 @@ use cephalon_rust_core::{
 };
 use config::settings;
 use freya::prelude::*;
-use tracing_subscriber::{fmt, prelude::*, Registry};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     window::WindowLevel,
@@ -30,7 +30,12 @@ fn main() {
         .create(true)
         .open("cephalon.log")
         .unwrap();
-    let subscriber = Registry::default().with(fmt::layer().with_writer(log_file));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("warn,cephalon_rust_core=info,cephalon_rust_overlay=info")
+    });
+    let subscriber = Registry::default()
+        .with(filter)
+        .with(fmt::layer().with_writer(log_file));
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // settings() is async; resolve it on a throwaway runtime before the UI starts
@@ -107,9 +112,12 @@ fn app(width: u32, height: u32, display_origin: (i32, i32)) -> impl IntoElement 
                         }));
                     }
                     Event::RewardsResolved(resolved) => {
-                        // keep the window rect from Opened; update slots only
-                        let window = screen.read().as_ref().and_then(|s| s.window);
-                        screen.set(Some(RewardScreen { slots: resolved, window }));
+                        // keep the window rect from Opened; update slots only.
+                        // ignore Resolved with no screen open — resurrecting one
+                        // here would lose the window rect and flash an orphan overlay
+                        if let Some(window) = screen.read().as_ref().map(|s| s.window) {
+                            screen.set(Some(RewardScreen { slots: resolved, window }));
+                        }
                     }
                     Event::RewardScreenClosed => {
                         screen.set(None);
