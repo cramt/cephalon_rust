@@ -117,8 +117,8 @@ pub async fn watcher() -> tokio::sync::mpsc::Receiver<LogEntry> {
                 if buffer.last() != Some(&b'\n') {
                     break;
                 }
-                let str = String::from_utf8(buffer).unwrap();
-                buffer = Vec::with_capacity(50);
+                let str = String::from_utf8_lossy(&buffer).into_owned();
+                buffer.clear();
                 if let Ok(entry) = str.parse() {
                     tx.send(entry).await.unwrap();
                 }

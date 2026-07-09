@@ -94,9 +94,18 @@ fn app(width: u32, height: u32, display_origin: (i32, i32)) -> impl IntoElement 
         std::thread::spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 let settings = settings().await;
-                let engine = Engine::new(settings.cache_path.clone())
-                    .await
-                    .expect("engine init failed");
+                // cold-cache init fires hundreds of live-market requests; transient
+                // failure is realistic. retry rather than silently killing the thread
+                // and leaving the hidden window as a zombie.
+                let engine = loop {
+                    match Engine::new(settings.cache_path.clone()).await {
+                        Ok(engine) => break engine,
+                        Err(e) => {
+                            tracing::error!("engine init failed, retrying in 30s: {e}");
+                            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        }
+                    }
+                };
                 engine.run(tx).await;
             });
         });
@@ -114,8 +123,12 @@ fn app(width: u32, height: u32, display_origin: (i32, i32)) -> impl IntoElement 
                     Event::RewardsResolved(resolved) => {
                         // keep the window rect from Opened; update slots only.
                         // ignore Resolved with no screen open — resurrecting one
-                        // here would lose the window rect and flash an orphan overlay
-                        if let Some(window) = screen.read().as_ref().map(|s| s.window) {
+                        // here would lose the window rect and flash an orphan overlay.
+                        // hoisted let: the peek guard must drop before set() or
+                        // State panics on write (try_write borrow conflict). peek is
+                        // non-subscribing, correct here — this is a bridge task, not render.
+                        let window = screen.peek().as_ref().map(|s| s.window);
+                        if let Some(window) = window {
                             screen.set(Some(RewardScreen { slots: resolved, window }));
                         }
                     }
