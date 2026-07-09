@@ -18,9 +18,12 @@ consume `Engine::run`'s `Event` stream and the pure-math `geometry` module.
 - The devshell exports `config.env` (`CACHE_PATH=./app_cache`).
 - `cargo nextest run` — tests hit the LIVE warframe.market v2 API on first run
   and cache into `CACHE_PATH` (per test CWD, so `core/app_cache` for core
-  tests). Warm runs are fast; cold OCR-test runs take minutes.
-- Deps are optimized even in dev (`[profile.dev.package."*"] opt-level = 3`),
-  so debug-mode tests are fine.
+  tests). First run downloads item data (a few seconds); after that the whole
+  suite is ~4s.
+- Both deps AND the workspace crates are optimized for tests
+  (`[profile.dev.package."*"]` + `[profile.test] opt-level = 3`) — the OCR/image
+  pixel work lives in our own `core`, so without the `test` override plain
+  `nextest` was ~48x slower (145s/test). No `--release` needed anymore.
 - warframe.market **v1 is dead** — everything uses v2 (`data` envelope,
   `_v2`-suffixed cache files). Don't reintroduce v1 endpoints.
 

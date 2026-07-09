@@ -4,3 +4,9 @@ resolver = "2"
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# OCR/image pixel work lives in our own `core` crate, so optimizing only deps
+# leaves plain `cargo nextest run` ~48x slower than release (145s vs 3s per OCR
+# test). Optimize the test build itself so tests don't need `--release`.
+[profile.test]
+opt-level = 3
