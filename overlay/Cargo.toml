@@ -7,7 +7,6 @@ edition = "2021"
 freya = "=0.4.0-rc.24"
 winit = { version = "0.30", features = ["wayland", "x11", "rwh_06"] }
 display-info = "0.5"
-futures-timer = "3"
 cephalon_rust_core = { path = "../core" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 config = "0.15"
