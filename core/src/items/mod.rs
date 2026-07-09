@@ -28,19 +28,23 @@ pub enum ReqwestSerdeError {
     ReqwestMiddlewareError(#[from] reqwest_middleware::Error),
 }
 
+/// v2 responses are wrapped in `{"apiVersion": ..., "data": ..., "error": ...}`.
+/// We only care about `data`; the rest is ignored.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Payload<T> {
-    payload: T,
+pub struct Data<T> {
+    pub data: T,
+}
+
+/// Shared v2 i18n shape. Every item carries localized strings under `i18n.<lang>`;
+/// we only ever read English.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct I18n {
+    pub en: I18nEn,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ItemsWrapper<T> {
-    items: Vec<T>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ItemWrapper<T> {
-    item: T,
+pub struct I18nEn {
+    pub name: String,
 }
 
 #[derive(Debug)]
@@ -99,7 +103,7 @@ async fn cache_in_file<
 pub async fn cached_get_item_identifiers(
     cache_path: &Path,
 ) -> Result<Vec<ItemIdentifier>, CacheError<ReqwestSerdeError>> {
-    cache_in_file(cache_path.join("item_identifiers.json"), || async {
+    cache_in_file(cache_path.join("item_identifiers_v2.json"), || async {
         get_item_identifiers().await
     })
     .await
@@ -109,7 +113,7 @@ pub async fn cached_fetch_relics(
     cache_path: &Path,
     item_identifiers: &Vec<ItemIdentifier>,
 ) -> Result<Vec<Relic>, CacheError<ReqwestSerdeError>> {
-    cache_in_file(cache_path.join("relics.json"), || async {
+    cache_in_file(cache_path.join("relics_v2.json"), || async {
         fetch_relics(item_identifiers).await
     })
     .await
@@ -119,7 +123,7 @@ pub async fn cached_items_and_sets(
     cache_path: &Path,
     item_identifiers: &Vec<ItemIdentifier>,
 ) -> Result<(HashMap<String, Item>, HashMap<String, ItemSet>), CacheError<ReqwestSerdeError>> {
-    cache_in_file(cache_path.join("items_and_sets.json"), || async {
+    cache_in_file(cache_path.join("items_and_sets_v2.json"), || async {
         fetch_items_and_sets(item_identifiers).await
     })
     .await

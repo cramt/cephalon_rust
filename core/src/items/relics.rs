@@ -1,12 +1,9 @@
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::client,
-    items::{ItemWrapper, Payload},
-};
+use crate::{config::client, items::Data};
 
-use super::{item_identifiers::ItemIdentifier, ReqwestSerdeError};
+use super::{item_identifiers::ItemIdentifier, I18n, ReqwestSerdeError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Relic {
@@ -20,22 +17,16 @@ pub struct Relic {
 
 pub async fn fetch_relics(identifiers: &[ItemIdentifier]) -> Result<Vec<Relic>, ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct MessageInner2 {
-        item_name: String,
-        description: String,
-    }
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct MessageInner {
-        vaulted: bool,
-        trading_tax: u32,
+    struct Message {
         id: String,
-        url_name: String,
+        slug: String,
         tags: Vec<String>,
-        en: MessageInner2,
-    }
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct Message {
-        items_in_set: Vec<MessageInner>,
+        // Some relics omit `vaulted` when unvaulted.
+        #[serde(default)]
+        vaulted: bool,
+        #[serde(rename = "tradingTax")]
+        trading_tax: u32,
+        i18n: I18n,
     }
     let relics = identifiers
         .iter()
@@ -46,13 +37,12 @@ pub async fn fetch_relics(identifiers: &[ItemIdentifier]) -> Result<Vec<Relic>, 
         .map(|name| async move {
             Ok(client()
                 .await
-                .get(format!("https://api.warframe.market/v1/items/{name}"))
+                .get(format!("https://api.warframe.market/v2/item/{name}"))
                 .send()
                 .await?
-                .json::<Payload<ItemWrapper<Message>>>()
+                .json::<Data<Message>>()
                 .await?
-                .payload
-                .item)
+                .data)
         })
         .collect::<FuturesUnordered<_>>()
         .collect::<Vec<_>>()
@@ -61,15 +51,16 @@ pub async fn fetch_relics(identifiers: &[ItemIdentifier]) -> Result<Vec<Relic>, 
         .collect::<Result<Vec<_>, ReqwestSerdeError>>()?;
     Ok(relics
         .into_iter()
-        .flat_map(|mut x| {
-            let x = x.items_in_set.pop()?;
+        .flat_map(|x| {
+            // Relic tags look like ["relic", "lith"]; the era is the non-"relic" tag.
+            let era = x.tags.into_iter().find(|t| t != "relic")?;
             Some(Relic {
                 id: x.id,
-                id_name: x.url_name,
+                id_name: x.slug,
                 vaulted: x.vaulted,
-                era: x.tags.into_iter().filter(|x| x != "relic").next()?,
+                era,
                 trading_tax: x.trading_tax,
-                name: x.en.item_name,
+                name: x.i18n.en.name,
             })
         })
         .collect::<Vec<_>>())

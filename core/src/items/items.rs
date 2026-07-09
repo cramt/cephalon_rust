@@ -4,7 +4,7 @@ use crate::items::orders::{Order, OrderType, Platform};
 use crate::items::ItemIdentifier;
 use crate::{
     config::client,
-    items::{ItemWrapper, Payload},
+    items::{Data, I18n},
 };
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -43,8 +43,8 @@ impl Item {
             .await?
             .into_iter()
             .filter(|x| {
-                x.platform == Some(Platform::Pc)
-                    && x.region == "en"
+                x.user.platform == Platform::Pc
+                    && x.user.locale == "en"
                     && x.order_type == OrderType::Buy
             })
             .collect::<Vec<_>>();
@@ -70,25 +70,22 @@ pub async fn fetch_items_and_sets(
     identifiers: &[ItemIdentifier],
 ) -> Result<(HashMap<String, Item>, HashMap<String, ItemSet>), ReqwestSerdeError> {
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct MessageInner2 {
-        item_name: String,
-        description: String,
-    }
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct MessageInner {
-        trading_tax: u32,
+    pub struct SetItem {
         id: String,
-        ducats: u32,
-        #[serde(default)]
-        quantity_for_set: u32,
+        slug: String,
+        #[serde(rename = "setRoot")]
         set_root: bool,
-        url_name: String,
-        tags: Vec<String>,
-        en: MessageInner2,
+        #[serde(rename = "tradingTax")]
+        trading_tax: u32,
+        ducats: u32,
+        // The set root omits `quantityInSet`; parts always carry it.
+        #[serde(rename = "quantityInSet", default)]
+        quantity_for_set: u32,
+        i18n: I18n,
     }
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct Message {
-        items_in_set: Vec<MessageInner>,
+    pub struct SetResponse {
+        items: Vec<SetItem>,
     }
     let items = identifiers
         .iter()
@@ -100,30 +97,31 @@ pub async fn fetch_items_and_sets(
         .filter(|x| !x.contains("primed"))
         .filter(|x| "gotva_prime" != x.as_str())
         .map(|name| async move {
-            let item = client()
+            let set = client()
                 .await
-                .get(format!("https://api.warframe.market/v1/items/{name}"))
+                .get(format!(
+                    "https://api.warframe.market/v2/item/{name}/set"
+                ))
                 .send()
                 .await?
-                .json::<Payload<ItemWrapper<Message>>>()
+                .json::<Data<SetResponse>>()
                 .await?
-                .payload
-                .item;
+                .data;
             let (roots, parts): (Vec<_>, Vec<_>) =
-                item.items_in_set.into_iter().partition(|n| n.set_root);
+                set.items.into_iter().partition(|n| n.set_root);
             let root = roots.into_iter().next().unwrap();
             let set = ItemSet {
                 id: root.id,
-                id_name: root.url_name,
-                name: root.en.item_name,
+                id_name: root.slug,
+                name: root.i18n.en.name,
                 part_ids: parts.iter().map(|x| x.id.clone()).collect(),
             };
             let parts = parts
                 .into_iter()
                 .map(|x| Item {
                     id: x.id,
-                    id_name: x.url_name,
-                    name: x.en.item_name,
+                    id_name: x.slug,
+                    name: x.i18n.en.name,
                     trading_tax: x.trading_tax,
                     set_id: set.id.clone(),
                     ducats: x.ducats,
