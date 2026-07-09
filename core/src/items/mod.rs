@@ -86,6 +86,9 @@ async fn cache_in_file<
         Some(x) => Ok(x),
         None => {
             let result = create().await.map_err(|x| CacheError::InnerError(x))?;
+            if let Some(parent) = path.as_ref().parent() {
+                std::fs::create_dir_all(parent).map_err(|x| CacheError::CreateFileError(x))?;
+            }
             let file = OpenOptions::new()
                 .read(true)
                 .write(true)
