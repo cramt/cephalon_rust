@@ -629,6 +629,18 @@ Pull the capture→OCR→price loop out of `Engine::run`'s spawned task into a t
 - Produces (used by Tasks 6, 7):
 
 ```rust
+// cephalon_rust_core::geometry (addition)
+/// screen-space rect of the game window, global/virtual-desktop coordinates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowRect { pub x: i32, pub y: i32, pub width: u32, pub height: u32 }
+
+// cephalon_rust_core::event (amendment to Task 4's enum)
+// RewardScreenOpened gains the game window's screen rect so frontends can
+// position UI relative to the game window, NOT the monitor — Warframe may be
+// borderless on half an ultrawide or on a secondary monitor. None = unknown
+// (e.g. future monitor-capture fallback); frontends then assume monitor-sized.
+RewardScreenOpened { count: usize, window: Option<WindowRect> },
+
 // cephalon_rust_core::reward_session
 pub trait CaptureSource: Send + Sync + 'static {
     fn capture(&self) -> anyhow::Result<image::DynamicImage>;
@@ -638,10 +650,13 @@ pub async fn run_reward_session(
     items: &HashMap<String, Item>,
     sender: &Sender<Event>,
     count: usize,
+    window_rect: Option<WindowRect>,
     session_duration: Duration,
 )
 pub const REWARD_PICK_WINDOW: Duration = Duration::from_secs(15);
 ```
+
+Amendment note (user requirement, added after Task 4 dispatched): add the `WindowRect` struct to `core/src/geometry.rs`, add the `window` field to `Event::RewardScreenOpened`, update the cli match arm to print it, and have `run_reward_session` forward it verbatim into the `RewardScreenOpened` it sends. The integration test passes `Some(WindowRect { x: 0, y: 0, width: img.width(), height: img.height() })` and asserts it round-trips in the opened event.
 
 - [ ] **Step 1: Write the failing integration test**
 
@@ -940,12 +955,15 @@ pub async fn run(self, sender: Sender<Event>) {
                 event!(Level::INFO, "relic reward screen detected");
                 match find_warframe_window() {
                     Some(window) => {
+                        // window rect in screen coords so frontends can position UI
+                        // relative to the game window (half-ultrawide, second monitor)
+                        let rect = window_rect(&window);
                         let capture = WindowCapture(window);
                         let items = self.items.clone();
                         let sender = sender.clone();
                         let count = squad_size;
                         tokio::spawn(async move {
-                            run_reward_session(&capture, &items, &sender, count, REWARD_PICK_WINDOW)
+                            run_reward_session(&capture, &items, &sender, count, rect, REWARD_PICK_WINDOW)
                                 .await;
                         });
                     }
@@ -966,6 +984,19 @@ fn find_warframe_window() -> Option<xcap::Window> {
         .ok()?
         .into_iter()
         .find(|x| x.title().unwrap_or_default() == "Warframe")
+}
+
+fn window_rect(window: &xcap::Window) -> Option<WindowRect> {
+    // xcap exposes x()/y()/width()/height() on Window (X11: GetGeometry +
+    // TranslateCoordinates). Adapt to the 0.9 API's exact shapes (they may
+    // return Results). None if any lookup fails — frontends fall back to
+    // assuming the game covers the monitor.
+    Some(WindowRect {
+        x: window.x().ok()?,
+        y: window.y().ok()?,
+        width: window.width().ok()?,
+        height: window.height().ok()?,
+    })
 }
 ```
 
@@ -1103,7 +1134,7 @@ fn main() {
 
     launch(
         LaunchConfig::new().with_window(
-            WindowConfig::new(move || app(logical.0, logical.1))
+            WindowConfig::new(move || app(logical.0, logical.1, (display.x, display.y)))
                 .with_title("cephalon")
                 .with_decorations(false)
                 .with_transparency(true)
@@ -1128,8 +1159,8 @@ fn main() {
     );
 }
 
-fn app(width: u32, height: u32) -> impl IntoElement {
-    let mut slots = use_state(|| Option::<Vec<RewardSlot>>::None);
+fn app(width: u32, height: u32, display_origin: (i32, i32)) -> impl IntoElement {
+    let mut screen = use_state(|| Option::<RewardScreen>::None);
 
     use_hook(move || {
         Platform::get().with_window(None, |w| {
@@ -1153,14 +1184,19 @@ fn app(width: u32, height: u32) -> impl IntoElement {
         spawn_forever(async move {
             while let Some(event) = rx.recv().await {
                 match event {
-                    Event::RewardScreenOpened { count } => {
-                        slots.set(Some(vec![RewardSlot::Pending; count]));
+                    Event::RewardScreenOpened { count, window } => {
+                        screen.set(Some(RewardScreen {
+                            slots: vec![RewardSlot::Pending; count],
+                            window,
+                        }));
                     }
                     Event::RewardsResolved(resolved) => {
-                        slots.set(Some(resolved));
+                        // keep the window rect from Opened; update slots only
+                        let window = screen.read().as_ref().and_then(|s| s.window);
+                        screen.set(Some(RewardScreen { slots: resolved, window }));
                     }
                     Event::RewardScreenClosed => {
-                        slots.set(None);
+                        screen.set(None);
                     }
                 }
             }
@@ -1168,23 +1204,47 @@ fn app(width: u32, height: u32) -> impl IntoElement {
     });
 
     use_side_effect(move || {
-        let visible = slots.read().is_some();
+        let visible = screen.read().is_some();
         Platform::get().with_window(None, move |w| w.set_visible(visible));
     });
 
     rect()
         .width(Size::fill())
         .height(Size::fill())
-        .maybe_child(slots.read().clone().map(|slots| RewardLabels {
-            slots,
-            width,
-            height,
+        .maybe_child(screen.read().clone().map(|s| {
+            // labels live inside the GAME WINDOW's rect, not the monitor's:
+            // warframe may be borderless on half an ultrawide or another monitor.
+            // rect coords are global screen space; the overlay window starts at
+            // display_origin, so translate. No rect -> assume game covers display.
+            let game = s.window.unwrap_or(cephalon_rust_core::geometry::WindowRect {
+                x: display_origin.0,
+                y: display_origin.1,
+                width,
+                height,
+            });
+            RewardLabels {
+                slots: s.slots,
+                offset_x: game.x - display_origin.0,
+                offset_y: game.y - display_origin.1,
+                width: game.width,
+                height: game.height,
+            }
         }))
+}
+
+#[derive(PartialEq, Clone)]
+struct RewardScreen {
+    slots: Vec<RewardSlot>,
+    window: Option<cephalon_rust_core::geometry::WindowRect>,
 }
 
 #[derive(PartialEq)]
 struct RewardLabels {
     slots: Vec<RewardSlot>,
+    /// game window origin relative to the overlay window
+    offset_x: i32,
+    offset_y: i32,
+    /// game window size — geometry is computed in the game's pixel space
     width: u32,
     height: u32,
 }
@@ -1194,7 +1254,11 @@ impl Component for RewardLabels {
         let regions = reward_card_regions(self.width, self.height, self.slots.len());
         self.slots.iter().zip(regions).fold(
             rect()
-                .position(Position::new_absolute().top(0.).left(0.))
+                .position(
+                    Position::new_absolute()
+                        .top(self.offset_y as f32)
+                        .left(self.offset_x as f32),
+                )
                 .width(Size::fill())
                 .height(Size::fill()),
             |el, (slot, region)| {
@@ -1235,6 +1299,7 @@ impl Component for RewardLabels {
 ```
 
 Notes for the implementer:
+- **Game-window-relative positioning is a hard requirement:** Warframe borderless on the left half of an ultrawide, or on a secondary monitor, must still get correctly-placed labels. That's why regions are computed from the game rect, not the display. If the game rect's center lies outside the overlay's display, log a warning (a follow-the-game window move is a recorded follow-up, not MVP — the `MONITOR` env override covers it).
 - `Color::new(0xCC14141A)` is ARGB: ~80% opaque near-black pill.
 - The label row sits one text-line below the card's name text (`text_bottom + line_height`), i.e. just under the card content — matches the approved mockup.
 - If the display scale factor is not 1.0, verify label alignment in Task 8; if labels land offset, the logical size passed to `app()` needs dividing by `scale_factor` (COSMIC at scale 1 won't show the difference).
@@ -1290,6 +1355,10 @@ If Warframe's EE.log truncation interferes, check the path matches `log_watcher:
 - [ ] **Step 2: Fix what step 1 surfaces**
 
 Most likely issues and where they live: labels misaligned (scale factor handling, Task 7 note), window not hiding (`use_side_effect`/`set_visible`), window behind game (re-check Task 2 spike findings — escalate if regressed). Commit fixes individually with descriptive messages.
+
+- [ ] **Step 2b: Non-fullscreen window placement check**
+
+Repeat step 1 with Warframe in a windowed/borderless configuration that does NOT cover the monitor (e.g. resized to roughly the left half of the screen). Expected: the "…" pills appear inside the Warframe window at card positions scaled to the window's size — not stretched across the whole monitor. This verifies the `WindowRect` plumbing end to end (xcap geometry under XWayland is the empirical unknown here — if coordinates come back wrong/zeroed under COSMIC's XWM, record what xcap returned and escalate).
 
 - [ ] **Step 3: Real fissure run (user acceptance)**
 
