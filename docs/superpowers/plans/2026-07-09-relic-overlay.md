@@ -967,7 +967,26 @@ pub async fn run(self, sender: Sender<Event>) {
                                 .await;
                         });
                     }
-                    None => event!(Level::WARN, "reward screen detected but no Warframe window"),
+                    None => {
+                        // no X11 window: warframe may be running as a native wayland
+                        // client (PROTON_ENABLE_WAYLAND) where xcap can't enumerate
+                        // windows. fall back to capturing the primary monitor —
+                        // borderless game means the frame still contains the cards,
+                        // and window=None tells frontends to assume monitor-sized.
+                        match primary_monitor_capture() {
+                            Some(capture) => {
+                                event!(Level::INFO, "no warframe window found, falling back to primary monitor capture");
+                                let items = self.items.clone();
+                                let sender = sender.clone();
+                                let count = squad_size;
+                                tokio::spawn(async move {
+                                    run_reward_session(&capture, &items, &sender, count, None, REWARD_PICK_WINDOW)
+                                        .await;
+                                });
+                            }
+                            None => event!(Level::WARN, "reward screen detected but no warframe window and no monitor to capture"),
+                        }
+                    }
                 }
             }
             LogEntry::NetInfo(x) if x == "Num session players: 1" => squad_size = 1,
@@ -1000,7 +1019,25 @@ fn window_rect(window: &xcap::Window) -> Option<WindowRect> {
 }
 ```
 
-(`.title()` shape depends on the post-Task-1 xcap API — adapt so it still means "window titled exactly Warframe". The old per-run mpsc relay channel `relic_screen_enabler` disappears entirely.)
+```rust
+pub struct MonitorCapture(xcap::Monitor);
+
+impl CaptureSource for MonitorCapture {
+    fn capture(&self) -> anyhow::Result<DynamicImage> {
+        Ok(DynamicImage::ImageRgba8(self.0.capture_image()?))
+    }
+}
+
+fn primary_monitor_capture() -> Option<MonitorCapture> {
+    xcap::Monitor::all()
+        .ok()?
+        .into_iter()
+        .find(|m| m.is_primary().unwrap_or(false))
+        .map(MonitorCapture)
+}
+```
+
+(`.title()`/`.is_primary()` shapes depend on the post-Task-1 xcap 0.9 API — adapt so the meaning holds. On Wayland, xcap's monitor capture goes through the XDG Screenshot portal — first use may show a one-time permission grant; that's expected and remembered. The old per-run mpsc relay channel `relic_screen_enabler` disappears entirely.)
 
 - [ ] **Step 3: Fix `cli/src/main.rs`**
 
