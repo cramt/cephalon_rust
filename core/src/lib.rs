@@ -15,6 +15,7 @@ use tracing::*;
 use xcap::{Window, XCapError};
 
 pub mod config;
+pub mod geometry;
 pub mod items;
 pub mod log_watcher;
 pub mod ocr;

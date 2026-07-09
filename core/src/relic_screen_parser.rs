@@ -7,7 +7,7 @@ use tracing::*;
 
 regex! { CapitalFinder = r#"[^$\s](?<capital>[A-Z])"# }
 
-use crate::{debug_write_image, items::items::Item, ocr};
+use crate::{debug_write_image, geometry::reward_card_regions, items::items::Item, ocr};
 
 #[derive(Debug)]
 pub enum ItemOrForma {
@@ -51,46 +51,26 @@ pub async fn parse_relic_screen<'a>(
         }
         buffer
     }
-    let width = img.width();
-    let height = img.height();
-    let middle = width / 2;
-    let frame_width = (width * 243) / 1920;
-    let frame_bottom = (height * 460) / 1080;
-    let text_height = (height * 24) / 1080;
-    let start_points = match amount.len() {
-        4 => vec![
-            (middle - frame_width * 2),
-            (middle - frame_width),
-            (middle),
-            (middle + frame_width),
-        ],
-        2 => vec![(middle - frame_width), (middle)],
-        3 => vec![
-            middle - ((3 * frame_width) / 2),
-            middle + (frame_width / 2),
-            middle - (frame_width / 2),
-        ],
-        1 => vec![(middle - (frame_width / 2))],
-        _ => Vec::new(),
-    };
-    start_points
+    let regions = reward_card_regions(img.width(), img.height(), amount.len());
+    regions
         .into_iter()
         .enumerate()
-        .map(|(i, x)| if amount.contains(&i) { Some(x) } else { None })
-        .map(|p| {
+        .map(|(i, region)| if amount.contains(&i) { Some(region) } else { None })
+        .map(|region| {
             let mut img = img.clone();
             async move {
-                let p = p?;
+                let region = region?;
                 // naive cropping
                 {
                     for i in (2..=3).rev() {
                         event!(Level::INFO, "trying naive cropping: {i} lines");
                         let new = img.crop(
-                            p,
-                            frame_bottom - (text_height * i),
-                            frame_width,
-                            text_height * i,
+                            region.x,
+                            region.text_bottom - (region.line_height * i),
+                            region.width,
+                            region.line_height * i,
                         );
+                        let p = region.x;
                         debug_write_image(&new, &format!("naive_crop_{p}_{i}"));
                         let result = ocr::ocr(new).await.ok()?;
                         let res = result.trim().replace("\n", " ");
@@ -107,11 +87,12 @@ pub async fn parse_relic_screen<'a>(
                     for i in 1.. {
                         event!(Level::INFO, "trying pessimistic cropping: {i} lines");
                         let new = img.crop(
-                            p,
-                            frame_bottom - (text_height * i),
-                            frame_width,
-                            text_height,
+                            region.x,
+                            region.text_bottom - (region.line_height * i),
+                            region.width,
+                            region.line_height,
                         );
+                        let p = region.x;
                         debug_write_image(&new, &format!("pessimistic_crop_{p}_{i}"));
                         let result = ocr::ocr(new).await.ok()?;
                         let res = result.trim();
