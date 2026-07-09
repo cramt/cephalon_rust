@@ -1,16 +1,16 @@
 #![allow(clippy::single_match)]
 
-use event::{Event, RewardSlot};
-use futures::{stream::FuturesOrdered, StreamExt};
+use event::Event;
+use geometry::WindowRect;
 use image::DynamicImage;
 use items::{
     cached_get_item_identifiers, cached_items_and_sets, items::Item, CacheError, ReqwestSerdeError,
 };
 use log_watcher::{watcher, LogEntry};
-use relic_screen_parser::{parse_relic_screen, ItemOrForma};
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use reward_session::{run_reward_session, CaptureSource, REWARD_PICK_WINDOW};
+use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
-use tokio::{fs::create_dir_all, sync::mpsc::Sender, time::sleep};
+use tokio::{fs::create_dir_all, sync::mpsc::Sender};
 use tracing::*;
 use xcap::{Window, XCapError};
 
@@ -21,6 +21,26 @@ pub mod log_watcher;
 pub mod event;
 pub mod ocr;
 pub mod relic_screen_parser;
+pub mod reward_session;
+
+pub struct WindowCapture(pub Window);
+
+impl CaptureSource for WindowCapture {
+    fn capture(&self) -> anyhow::Result<DynamicImage> {
+        Ok(DynamicImage::ImageRgba8(self.0.capture_image()?))
+    }
+}
+
+/// build a [`WindowRect`] from the live window geometry; `None` if any of the
+/// position/size queries fail so frontends fall back to monitor-sized layout
+fn window_rect(window: &Window) -> Option<WindowRect> {
+    Some(WindowRect {
+        x: window.x().ok()?,
+        y: window.y().ok()?,
+        width: window.width().ok()?,
+        height: window.height().ok()?,
+    })
+}
 
 pub struct Engine {
     items: HashMap<String, Item>,
@@ -70,65 +90,18 @@ impl Engine {
             let (tx, mut rx) = tokio::sync::mpsc::channel::<usize>(100);
 
             tokio::spawn(async move {
+                let capture = WindowCapture(warframe);
                 while let Some(amount) = rx.recv().await {
                     event!(Level::INFO, "relic screen parser activated");
-                    let _ = sender.send(Event::RewardScreenOpened { count: amount }).await;
-                    let mut total_results = (0..amount)
-                        .map(|_| None)
-                        .collect::<Vec<Option<ItemOrForma>>>();
-                    for i in 0..10 {
-                        event!(Level::INFO, "relic screen run {i}");
-                        sleep(Duration::from_millis(1000)).await;
-                        let image = warframe.capture_image().unwrap();
-                        let image = DynamicImage::ImageRgba8(image);
-                        debug_write_image(&image, &format!("reward_capture_{i}"));
-                        let results = parse_relic_screen(
-                            &image,
-                            &total_results
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, x)| x.is_none())
-                                .map(|(i, _)| i)
-                                .collect(),
-                            &self.items,
-                        )
-                        .await;
-                        total_results = total_results
-                            .into_iter()
-                            .zip(results.into_iter())
-                            .map(|(a, b)| match (a, b) {
-                                (Some(x), _) => Some(x),
-                                (_, Some(x)) => Some(x),
-                                _ => None,
-                            })
-                            .collect();
-                        let finished =
-                            total_results.iter().filter(|x| x.is_some()).count() == amount;
-                        let slots = total_results
-                            .iter()
-                            .map(|x| async move {
-                                match x {
-                                    None => RewardSlot::Pending,
-                                    Some(ItemOrForma::Forma1X) | Some(ItemOrForma::Forma2X) => {
-                                        RewardSlot::Forma
-                                    }
-                                    Some(ItemOrForma::Item(item)) => RewardSlot::Item {
-                                        item: item.clone(),
-                                        price: item.price().await.ok(),
-                                    },
-                                }
-                            })
-                            .collect::<FuturesOrdered<_>>()
-                            .collect::<Vec<_>>()
-                            .await;
-                        let _ = sender.send(Event::RewardsResolved(slots)).await;
-
-                        if finished {
-                            event!(Level::INFO, "relic screen run found all, finishing early");
-                            break;
-                        }
-                    }
-                    let _ = sender.send(Event::RewardScreenClosed).await;
+                    run_reward_session(
+                        &capture,
+                        &self.items,
+                        &sender,
+                        amount,
+                        window_rect(&capture.0),
+                        REWARD_PICK_WINDOW,
+                    )
+                    .await;
                 }
             });
 

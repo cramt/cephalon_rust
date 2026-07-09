@@ -1,3 +1,12 @@
+/// screen-space rect of the game window, global/virtual-desktop coordinates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Screen-space region of one reward card's name text, in the same pixel space
 /// as the value passed for `screen_width`/`screen_height`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

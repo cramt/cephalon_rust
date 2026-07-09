@@ -27,8 +27,8 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                Event::RewardScreenOpened { count } => {
-                    println!("reward screen opened ({count} cards)")
+                Event::RewardScreenOpened { count, window } => {
+                    println!("reward screen opened ({count} cards) window: {window:?}")
                 }
                 Event::RewardsResolved(slots) => {
                     let summary = slots

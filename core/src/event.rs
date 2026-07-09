@@ -1,4 +1,4 @@
-use crate::items::items::Item;
+use crate::{geometry::WindowRect, items::items::Item};
 
 /// One reward card slot, indexed to match `geometry::reward_card_regions`.
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +13,10 @@ pub enum RewardSlot {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    RewardScreenOpened { count: usize },
+    RewardScreenOpened {
+        count: usize,
+        window: Option<WindowRect>,
+    },
     RewardsResolved(Vec<RewardSlot>),
     RewardScreenClosed,
 }
