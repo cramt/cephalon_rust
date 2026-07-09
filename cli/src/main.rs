@@ -50,6 +50,6 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     });
-    engine.run(tx).await?;
+    engine.run(tx).await;
     Ok(())
 }

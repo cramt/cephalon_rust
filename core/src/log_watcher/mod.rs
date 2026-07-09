@@ -98,10 +98,19 @@ impl FromStr for LogEntry {
 
 pub async fn watcher() -> tokio::sync::mpsc::Receiver<LogEntry> {
     let (tx, rx) = tokio::sync::mpsc::channel(100);
-    let mut file = BufReader::new(File::open(get_default_path()).await.unwrap());
-    file.seek(SeekFrom::End(0)).await.unwrap();
-    let mut buffer = Vec::with_capacity(50);
     tokio::spawn(async move {
+        let path = get_default_path();
+        let mut file = loop {
+            match File::open(&path).await {
+                Ok(f) => break BufReader::new(f),
+                Err(_) => {
+                    event!(Level::INFO, "EE.log not found yet, waiting");
+                    sleep(Duration::from_secs(5)).await;
+                }
+            }
+        };
+        file.seek(SeekFrom::End(0)).await.unwrap();
+        let mut buffer = Vec::with_capacity(50);
         loop {
             loop {
                 file.read_until(b'\n', &mut buffer).await.unwrap();
