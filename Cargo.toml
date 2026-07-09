@@ -1,5 +1,5 @@
 [workspace]
-members = [ "cli","core"]
+members = [ "cli", "core", "overlay" ]
 resolver = "2"
 
 [profile.dev.package."*"]

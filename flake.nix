@@ -62,6 +62,11 @@
           xorg.libxcb
           libgbm
           pipewire
+          # freya/skia
+          fontconfig
+          freetype
+          expat
+          libxkbcommon
         ];
 
         # TODO: these 2 should only be during build, not sure if it is currently
